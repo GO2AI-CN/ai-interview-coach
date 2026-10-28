@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 模拟面试教练</title>
+<style>
+  body{font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;max-width:720px;margin:0 auto;padding:20px;background:#0f172a;color:#e2e8f0}
+  h1{font-size:20px} h2{font-size:15px;color:#94a3b8;font-weight:normal}
+  #setup,#chat{display:none} #setup.on,#chat.on{display:block}
+  input,textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:15px}
+  button{padding:10px 18px;border:0;border-radius:8px;background:#3b82f6;color:#fff;font-size:15px;cursor:pointer}
+  .msg{margin:12px 0;padding:12px 14px;border-radius:10px;white-space:pre-wrap;line-height:1.7;font-size:15px}
+  .q{background:#1e3a5f}.a{background:#14532d}.c{background:#3b2f5e;font-style:italic}
+  .bar{display:flex;gap:8px;margin-top:10px}
+  #meta{font-size:13px;color:#64748b;margin:8px 0}
+  #report{background:#1e293b;padding:16px;border-radius:10px;white-space:pre-wrap;line-height:1.8}
+</style>
+</head>
+<body>
+<div id="setup" class="on">
+  <h1>AI 模拟面试教练</h1>
+  <h2>输入目标岗位，开始一场结构化模拟面试</h2>
+  <input id="pos" placeholder="如：高级后端工程师" value="高级后端工程师">
+  <div class="bar"><button onclick="start()">开始面试</button></div>
+</div>
+<div id="chat">
+  <h1>AI 模拟面试教练</h1>
+  <div id="meta"></div>
+  <div id="log"></div>
+  <div id="composer">
+    <textarea id="ans" rows="3" placeholder="输入你的回答…"></textarea>
+    <div class="bar"><button id="sendBtn" onclick="submit()">提交回答</button></div>
+  </div>
+  <div id="report" style="display:none"></div>
+</div>
+<script>
+let session=null;
+const $=id=>document.getElementById(id);
+const log=(cls,html)=>{const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;$('log').appendChild(d);d.scrollIntoView({behavior:'smooth'});return d;};
+
+async function start(){
+  const pos=$('pos').value.trim(); if(!pos)return;
+  const r=await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({position:pos})});
+  const d=await r.json(); if(d.error){alert(d.error);return;}
+  session=d.session;
+  $('setup').className='';$('chat').className='on';
+  showQuestion(d.question,d.index,d.total);
+}
+function showQuestion(q,i,n){
+  $('meta').textContent='第 '+i+' / '+n+' 题 · '+q.dimension+(q.source==='resume'?'（简历深挖）':'');
+  log('q','<b>面试官：</b>'+esc(q.question));
+}
+async function submit(){
+  const a=$('ans').value.trim(); if(!a||!session)return;
+  $('ans').value='';$('sendBtn').disabled=true;
+  log('a','<b>你：</b>'+esc(a));
+  const c=log('c','<b>面试官点评：</b>');
+  // SSE：用 fetch 读流，手写 EventSource 解析（因为带查询参数的回答较长）
+  const resp=await fetch('/api/answer?session='+session+'&a='+encodeURIComponent(a));
+  const reader=resp.body.getReader(),dec=new TextDecoder();
+  let buf='';
+  while(true){
+    const{done,value}=await reader.read(); if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    let p;
+    while((p=buf.indexOf('\n\n'))>=0){
+      const block=buf.slice(0,p); buf=buf.slice(p+2);
+      handleEvent(block,c);
+    }
+  }
+  $('sendBtn').disabled=false;
+}
+function handleEvent(block,c){
+  let ev='message',data='';
+  for(const line of block.split('\n')){
+    if(line.startsWith('event:'))ev=line.slice(6).trim();
+    if(line.startsWith('data:'))data+=line.slice(5).trim();
+  }
+  if(ev==='token'){c.innerHTML+=esc(JSON.parse(data).t);}
+  if(ev==='result'){window._last=JSON.parse(data);}
+  if(ev==='done'){afterResult(window._last||{});}
+}
+async function afterResult(r){
+  if(r.question){
+    const isFollowup=r.followup!==false&&r.followup!==undefined&&!r.index;
+    if(isFollowup){log('q','<b>追问：</b>'+esc(r.question));}
+    else{
+      const q=await (await fetch('/api/question?session='+session)).json();
+      if(q.done){finish();return;}
+      showQuestion(q.question,q.index,q.total);
+    }
+  }else{finish();}
+}
+async function finish(){
+  $('composer').style.display='none';
+  const d=await (await fetch('/api/report?session='+session)).json();
+  if(d.report){$('report').style.display='block';$('report').textContent=d.report;}
+  log('c','<b>面试结束。</b>综合得分 '+d.overall+'/100，完整报告见下方。');
+}
+const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+</script>
+</body>
+</html>

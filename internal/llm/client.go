@@ -1,11 +1,10 @@
-// Package llm 封装大模型调用：JSON 模式 + 纯文本模式。
-// Client 是接口，方便测试时用 Mock 替换。
 package llm
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
@@ -19,6 +18,8 @@ type Client interface {
 	ChatJSON(ctx context.Context, system, user, schemaName, schemaDesc string, schema any, out any) error
 	// ChatText 普通对话，返回文本。
 	ChatText(ctx context.Context, system, user string) (string, error)
+	// ChatStream 流式对话：逐 token 回调 onToken，返回完整文本。
+	ChatStream(ctx context.Context, system, user string, onToken func(string)) (string, error)
 }
 
 // OpenAIClient 基于 openai-go v3 的实现，兼容任何 OpenAI 协议端点
@@ -44,11 +45,15 @@ func NewOpenAIClientWithBaseURL(model, baseURL, apiKey string) *OpenAIClient {
 	}
 }
 
-func (c *OpenAIClient) ChatText(ctx context.Context, system, user string) (string, error) {
-	resp, err := c.cli.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+func (c *OpenAIClient) chatParams(system, user string) openai.ChatCompletionNewParams {
+	return openai.ChatCompletionNewParams{
 		Model:    shared.ChatModel(c.model),
 		Messages: []openai.ChatCompletionMessageParamUnion{openai.SystemMessage(system), openai.UserMessage(user)},
-	})
+	}
+}
+
+func (c *OpenAIClient) ChatText(ctx context.Context, system, user string) (string, error) {
+	resp, err := c.cli.Chat.Completions.New(ctx, c.chatParams(system, user))
 	if err != nil {
 		return "", fmt.Errorf("chat: %w", err)
 	}
@@ -56,6 +61,29 @@ func (c *OpenAIClient) ChatText(ctx context.Context, system, user string) (strin
 		return "", fmt.Errorf("chat: empty choices")
 	}
 	return resp.Choices[0].Message.Content, nil
+}
+
+// ChatStream 流式输出：SSE 逐 chunk 读取，边读边回调，用户体验"字往外蹦"。
+func (c *OpenAIClient) ChatStream(ctx context.Context, system, user string, onToken func(string)) (string, error) {
+	stream := c.cli.Chat.Completions.NewStreaming(ctx, c.chatParams(system, user))
+	defer stream.Close()
+
+	var full strings.Builder
+	for stream.Next() {
+		chunk := stream.Current()
+		for _, choice := range chunk.Choices {
+			if tok := choice.Delta.Content; tok != "" {
+				full.WriteString(tok)
+				if onToken != nil {
+					onToken(tok) // 逐 token 推送
+				}
+			}
+		}
+	}
+	if err := stream.Err(); err != nil {
+		return full.String(), fmt.Errorf("stream: %w", err)
+	}
+	return full.String(), nil
 }
 
 func (c *OpenAIClient) ChatJSON(ctx context.Context, system, user, schemaName, schemaDesc string, schema any, out any) error {

@@ -15,6 +15,13 @@ func (m mockClient) ChatText(_ context.Context, _, _ string) (string, error) {
 	return "", nil
 }
 
+func (m mockClient) ChatStream(_ context.Context, _, _ string, onToken func(string)) (string, error) {
+	if onToken != nil {
+		onToken("点评")
+	}
+	return "点评", nil
+}
+
 func (m mockClient) ChatJSON(_ context.Context, _, _, name, _ string, _ any, out any) error {
 	m.t.Helper()
 	var payload []byte

@@ -76,7 +76,7 @@ func Save(st *State, path string) error {
 
 ## 五、完整工程与验证
 
-工程结构如下，完整代码已开源：`https://github.com/<OWNER>/ai-interview-coach`
+工程结构如下，完整代码已开源：`https://github.com/LittleMoreInteresting/ai-interview-coach`
 
 ```text
 cmd/coach/        命令行入口（交互问答循环）

@@ -24,6 +24,7 @@ import (
 	"ai-interview-coach/internal/llm"
 	"ai-interview-coach/internal/report"
 	"ai-interview-coach/internal/resume"
+	"ai-interview-coach/internal/web"
 )
 
 func main() {
@@ -43,6 +44,7 @@ func usage() {
 用法：
   coach new --pos "目标岗位" [--resume 简历.pdf]   开一场新面试
   coach continue                                   接着上次的面试继续
+  coach web [--addr :8080]                         启动网页版（流式点评）
 
 环境变量：
   OPENAI_API_KEY   API Key（必填）
@@ -93,6 +95,12 @@ func run() error {
 		}
 		it = coach.ResumeInterview(st, client)
 		fmt.Printf("继续面试：第 %d/%d 题。\n\n", st.Cursor+1, len(st.Plan.Questions))
+
+	case "web":
+		fs := flag.NewFlagSet("web", flag.ExitOnError)
+		addr := fs.String("addr", ":8080", "监听地址")
+		fs.Parse(os.Args[2:])
+		return web.NewServer(client).ListenAndServe(*addr)
 
 	default:
 		usage()

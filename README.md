@@ -34,6 +34,9 @@ go run ./cmd/coach new --pos "高级后端工程师" --resume ./resume.pdf
 
 # 面试没面完，下次接着面
 go run ./cmd/coach continue
+
+# 启动网页版（SSE 流式点评，浏览器打开即用）
+go run ./cmd/coach web --addr :8080
 ```
 
 面试结束后在当前目录生成 `report.md`（各维度得分 + 薄弱点 + 改进建议）。
