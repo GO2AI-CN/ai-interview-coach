@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"ai-interview-coach/internal/bot"
 	"ai-interview-coach/internal/coach"
 	"ai-interview-coach/internal/llm"
 	"ai-interview-coach/internal/report"
@@ -45,11 +46,13 @@ func usage() {
   coach new --pos "目标岗位" [--resume 简历.pdf]   开一场新面试
   coach continue                                   接着上次的面试继续
   coach web [--addr :8080]                         启动网页版（流式点评）
+  coach bot                                          启动飞书机器人（长连接）
 
 环境变量：
   OPENAI_API_KEY   API Key（必填）
   OPENAI_BASE_URL  兼容 OpenAI 协议的端点（可选，如 DeepSeek/Kimi）
-  COACH_MODEL      模型名（可选，默认 gpt-4o-mini）`)
+  COACH_MODEL      模型名（可选，默认 gpt-4o-mini）
+  FEISHU_APP_ID / FEISHU_APP_SECRET  飞书自建应用凭据（bot 命令必填）`)
 }
 
 func run() error {
@@ -101,6 +104,16 @@ func run() error {
 		addr := fs.String("addr", ":8080", "监听地址")
 		fs.Parse(os.Args[2:])
 		return web.NewServer(client).ListenAndServe(*addr)
+
+	case "bot":
+		// 飞书机器人（长连接模式，无需公网 IP）。
+		// 凭据从环境变量读，避免命令行历史泄露。
+		appID, appSecret := os.Getenv("FEISHU_APP_ID"), os.Getenv("FEISHU_APP_SECRET")
+		if appID == "" || appSecret == "" {
+			return fmt.Errorf("请先设置环境变量 FEISHU_APP_ID / FEISHU_APP_SECRET")
+		}
+		b := bot.NewBot(bot.NewLarkSender(appID, appSecret), bot.CoachFactory(client), 0)
+		return b.Run(ctx, appID, appSecret)
 
 	default:
 		usage()

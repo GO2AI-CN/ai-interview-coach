@@ -6,6 +6,8 @@
 
 - [上篇：出题、追问、打分，一个 Agent 全搞定](docs/2026-10-27-ai-interview-coach-1.md)
 - [下篇：接入简历解析，让面试官先读你的简历](docs/2026-10-28-ai-interview-coach-2.md)
+- [第三篇：Web 版 + SSE 流式输出](docs/2026-10-28-ai-interview-coach-3-web.md)
+- [第四篇：接入飞书机器人（长连接，零公网 IP）](docs/2026-10-28-ai-interview-coach-4-feishu.md)
 
 ## 功能
 
@@ -14,6 +16,8 @@
 - **结构化输出**：评分报告用 JSON Schema（Structured Outputs）锁死格式，Go struct 解析并渲染成 Markdown
 - **简历解析**：PDF 文本提取（纯 Go，无 CGO）→ 模型生成结构化摘要 → 生成针对性简历深挖题
 - **多轮记忆**：面试状态持久化到 `.coach-state.json`，今天面 3 题，明天 `coach continue` 接着面
+- **网页版**：SSE 流式点评，逐字打出评估（见第三篇）
+- **飞书机器人**：官方长连接接入，群里 @ 机器人即可开考，无需公网 IP（见第四篇）
 
 ## 快速开始
 
@@ -37,6 +41,11 @@ go run ./cmd/coach continue
 
 # 启动网页版（SSE 流式点评，浏览器打开即用）
 go run ./cmd/coach web --addr :8080
+
+# 启动飞书机器人（群里 @ 机器人：面试 <岗位>）
+export FEISHU_APP_ID=你的AppID
+export FEISHU_APP_SECRET=你的AppSecret
+go run ./cmd/coach bot
 ```
 
 面试结束后在当前目录生成 `report.md`（各维度得分 + 薄弱点 + 改进建议）。
@@ -44,11 +53,13 @@ go run ./cmd/coach web --addr :8080
 ## 工程结构
 
 ```
-cmd/coach/        命令行入口（交互问答循环）
+cmd/coach/        命令行入口（new / continue / web / bot 四个子命令）
 internal/coach/   面试状态机：计划 / 评估 / 追问判断 / 状态持久化
 internal/llm/     openai-go v3 封装（JSON Schema 模式 + 纯文本模式）
 internal/resume/  PDF 文本提取 + 简历结构化摘要
 internal/report/  评分报告 Markdown 渲染
+internal/web/     网页版 HTTP 服务（SSE 流式）
+internal/bot/     飞书机器人：长连接接入 + 会话路由（IM 适配层）
 docs/             配套公众号教程
 ```
 
