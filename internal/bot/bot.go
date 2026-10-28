@@ -8,6 +8,7 @@ package bot
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,17 @@ type Interview interface {
 // Factory 按目标岗位开一场新面试。
 type Factory func(ctx context.Context, position string) (Interview, error)
 
+// Transcriber 语音转文字（ASR）的最小抽象，生产实现见 internal/asr。
+type Transcriber interface {
+	Transcribe(ctx context.Context, audio io.Reader, filename string) (string, error)
+}
+
+// AudioFetcher 按消息 ID + file_key 下载语音字节流，
+// 返回 reader 和原始文件名（用于推断音频格式）。IM 层实现（飞书），核心不感知。
+type AudioFetcher interface {
+	Fetch(ctx context.Context, messageID, fileKey string) (io.Reader, string, error)
+}
+
 // session 一个用户的一场进行中的面试。
 // mu 把同一用户并发的多条消息串行化，避免把状态机打坏。
 type session struct {
@@ -46,24 +58,43 @@ type session struct {
 type Bot struct {
 	sender   Sender
 	factory  Factory
+	fetcher  AudioFetcher     // 可选：语音消息下载器（飞书资源接口）
+	asr      Transcriber      // 可选：语音转文字；两者都配了才支持语音作答
 	ttl      time.Duration    // 会话闲置多久后作废（默认 2 小时）
 	sessions sync.Map         // key: chatID|senderOpenID -> *session
 	now      func() time.Time // 便于测试控制时间
 }
 
+// Option 给 NewBot 追加可选能力（语音识别等）。
+type Option func(*Bot)
+
+// WithAudio 注入语音能力：fetcher 下载语音字节流，tr 转文字。
+// 只传一个或都不传时，语音作答会被优雅拒绝，不影响文字功能。
+func WithAudio(fetcher AudioFetcher, tr Transcriber) Option {
+	return func(b *Bot) {
+		b.fetcher = fetcher
+		b.asr = tr
+	}
+}
+
 // NewBot 构造机器人。ttl<=0 时默认 2 小时。
-func NewBot(sender Sender, factory Factory, ttl time.Duration) *Bot {
+func NewBot(sender Sender, factory Factory, ttl time.Duration, opts ...Option) *Bot {
 	if ttl <= 0 {
 		ttl = 2 * time.Hour
 	}
-	return &Bot{sender: sender, factory: factory, ttl: ttl, now: time.Now}
+	b := &Bot{sender: sender, factory: factory, ttl: ttl, now: time.Now}
+	for _, opt := range opts {
+		opt(b)
+	}
+	return b
 }
 
 const helpText = `我是 AI 模拟面试教练 🤖 指令如下：
   面试 <目标岗位>   开一场新面试（如：面试 Go 后端工程师）
   结束              提前结束并出评分报告
   帮助              显示本说明
-开考后直接文字作答即可，我会逐题评估、答得浅会自动追问。`
+开考后文字、语音作答都可以；我会先语音转文字（回复里会附上识别结果），
+再逐题评估，答得浅会自动追问。`
 
 // HandleText 处理一条已经提取好的纯文本消息。
 // key 是会话标识（通常 chatID|senderOpenID），text 是去掉 @ 机器人后的文本。
@@ -131,6 +162,32 @@ func (b *Bot) HandleText(ctx context.Context, key, text string) (string, error) 
 		return "", err
 	}
 	return feedback + "\n\n面试结束 🎉 评分报告：\n\n" + rep, nil
+}
+
+// HandleAudio 处理一条语音作答：先 ASR 转文字，再走与文字消息完全
+// 相同的指令/作答管线——所以对着机器人说「结束」也能正常出报告。
+// audio 是语音字节流，filename 仅用于推断格式，可为空。
+func (b *Bot) HandleAudio(ctx context.Context, key string, audio io.Reader, filename string) (string, error) {
+	if b.asr == nil {
+		return "这个机器人没开语音识别，请用文字作答～", nil
+	}
+	text, err := b.asr.Transcribe(ctx, audio, filename)
+	if err != nil {
+		return "", fmt.Errorf("语音识别失败: %w", err)
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return "这段语音没听清，请靠近话筒、说普通话再试一次～", nil
+	}
+	reply, err := b.HandleText(ctx, key, text)
+	if err != nil {
+		return "", err
+	}
+	if reply == "" {
+		return "", nil
+	}
+	// 把识别结果前置展示：评估以它为准，用户能当场发现识别偏差
+	return "【语音识别】" + text + "\n\n" + reply, nil
 }
 
 // load 取会话并做惰性过期检查。

@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"regexp"
 	"strings"
+	"time"
 
 	lark "github.com/larksuite/oapi-sdk-go/v3"
 	"github.com/larksuite/oapi-sdk-go/v3/event/dispatcher"
@@ -22,9 +24,32 @@ import (
 // mentionRE 匹配消息体里的 @机器人 占位符（@_user_1 这种）。
 var mentionRE = regexp.MustCompile(`@_user_\d+`)
 
+// maxAudioDuration 单条作答语音的最长时长，超出提示分段（自己的兜底，
+// 飞书资源接口本身限 100MB，ASR 供应商另有上限，取最严的）。
+const maxAudioDuration = 3 * 60 * 1000 // 3 分钟，毫秒
+
 // LarkSender 用飞书 OpenAPI 的「回复消息」接口把文本发回会话。
 type LarkSender struct {
 	cli *lark.Client
+}
+
+// Fetch 实现 bot.AudioFetcher：下载语音消息的二进制流。
+// 走 GET /open-apis/im/v1/messages/:message_id/resources/:file_key（type=file），
+// 返回字节流和原始文件名（响应头里带，用于推断 opus/ogg 格式）。
+func (s *LarkSender) Fetch(ctx context.Context, messageID, fileKey string) (io.Reader, string, error) {
+	req := larkim.NewGetMessageResourceReqBuilder().
+		MessageId(messageID).
+		FileKey(fileKey).
+		Type("file"). // file 类型覆盖音频/视频/普通文件
+		Build()
+	resp, err := s.cli.Im.MessageResource.Get(ctx, req)
+	if err != nil {
+		return nil, "", err
+	}
+	if !resp.Success() {
+		return nil, "", fmt.Errorf("下载语音失败: code=%d msg=%s", resp.Code, resp.Msg)
+	}
+	return resp.File, resp.FileName, nil
 }
 
 // NewLarkSender 构造发送器；appID/appSecret 即自建应用的凭据。
@@ -123,7 +148,17 @@ func (b *Bot) Run(ctx context.Context, appID, appSecret string) error {
 	return cli.Start(ctx)
 }
 
-// onP2MessageReceive 消息事件入口：过滤 → 提文本 → 走核心 → 回复。
+// 会话标识：群/单聊 ID + 发送者 open_id，两人同群互不干扰。
+// 文字和语音走同一个 key，混着答（文字一题、语音一题）互不影响。
+func sessionKey(e *larkim.P2MessageReceiveV1, msg *larkim.EventMessage) string {
+	senderID := ""
+	if e.Event.Sender.SenderId != nil && e.Event.Sender.SenderId.OpenId != nil {
+		senderID = *e.Event.Sender.SenderId.OpenId
+	}
+	return *msg.ChatId + "|" + senderID
+}
+
+// onP2MessageReceive 消息事件入口：过滤 → 提文本/语音 → 走核心 → 回复。
 func (b *Bot) onP2MessageReceive(ctx context.Context, e *larkim.P2MessageReceiveV1) error {
 	msg := e.Event.Message
 
@@ -131,30 +166,71 @@ func (b *Bot) onP2MessageReceive(ctx context.Context, e *larkim.P2MessageReceive
 	if e.Event.Sender.SenderType == nil || *e.Event.Sender.SenderType != "user" {
 		return nil
 	}
-	// 2) 只处理文字消息
+
+	// 2) 语音消息：转写后走与文字相同的作答管线
+	if msg.MessageType != nil && *msg.MessageType == "audio" {
+		return b.onAudioMessage(ctx, e, msg)
+	}
+
+	// 3) 只处理文字消息
 	if msg.MessageType == nil || *msg.MessageType != "text" {
-		return b.reply(ctx, msg, "目前只支持文字消息，请用文字作答～")
+		return b.reply(ctx, msg, "目前只支持文字和语音消息，请用其中一种作答～")
 	}
 	text, ok := extractText(*msg.Content)
 	if !ok {
 		return b.reply(ctx, msg, "没读懂这条消息，请重新发一次。")
 	}
-	// 3) 群聊里只响应 @ 机器人的消息；p2p 单聊全响应
+	// 4) 群聊里只响应 @ 机器人的消息；p2p 单聊全响应
 	if msg.ChatType != nil && *msg.ChatType == "group" && !mentionRE.MatchString(text) {
 		return nil
 	}
 	text = strings.TrimSpace(mentionRE.ReplaceAllString(text, ""))
 
-	// 4) 会话标识：群/单聊 ID + 发送者 open_id，两人同群互不干扰
-	senderID := ""
-	if e.Event.Sender.SenderId != nil && e.Event.Sender.SenderId.OpenId != nil {
-		senderID = *e.Event.Sender.SenderId.OpenId
-	}
-	key := *msg.ChatId + "|" + senderID
-
-	reply, err := b.HandleText(ctx, key, text)
+	reply, err := b.HandleText(ctx, sessionKey(e, msg), text)
 	if err != nil {
 		log.Printf("[bot] 处理消息失败: %v", err)
+		reply = "系统开小差了，请稍后再试 🙏"
+	}
+	if reply == "" {
+		return nil
+	}
+	return b.reply(ctx, msg, reply)
+}
+
+// onAudioMessage 语音消息入口。语音没法 @ 机器人，群聊响应规则与文字不同：
+// 只有该用户已有进行中的面试时才响应（否则群里每条语音都回话就太吵了）。
+func (b *Bot) onAudioMessage(ctx context.Context, e *larkim.P2MessageReceiveV1, msg *larkim.EventMessage) error {
+	key := sessionKey(e, msg)
+
+	// 群聊守卫：没有进行中的面试就静默忽略
+	if msg.ChatType != nil && *msg.ChatType == "group" && b.load(key) == nil {
+		return nil
+	}
+	if b.fetcher == nil || b.asr == nil {
+		return b.reply(ctx, msg, "这个机器人没开语音识别，请用文字作答～")
+	}
+
+	// 语音消息的 content 是 JSON：{"file_key":"...","duration":<毫秒>}
+	var body struct {
+		FileKey  string `json:"file_key"`
+		Duration int64  `json:"duration"`
+	}
+	if err := json.Unmarshal([]byte(*msg.Content), &body); err != nil || body.FileKey == "" {
+		return b.reply(ctx, msg, "语音消息解析失败，请重发一次。")
+	}
+	if body.Duration > maxAudioDuration {
+		return b.reply(ctx, msg, fmt.Sprintf("语音太长了（限 %d 分钟），请分段作答～", maxAudioDuration/time.Minute))
+	}
+
+	reader, filename, err := b.fetcher.Fetch(ctx, *msg.MessageId, body.FileKey)
+	if err != nil {
+		log.Printf("[bot] 下载语音失败: %v", err)
+		return b.reply(ctx, msg, "语音下载失败，请改用文字作答。")
+	}
+
+	reply, err := b.HandleAudio(ctx, key, reader, filename)
+	if err != nil {
+		log.Printf("[bot] 语音处理失败: %v", err)
 		reply = "系统开小差了，请稍后再试 🙏"
 	}
 	if reply == "" {

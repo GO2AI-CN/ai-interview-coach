@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -172,6 +173,77 @@ func TestFactoryError(t *testing.T) {
 	_, err := b.HandleText(context.Background(), "k", "面试 Go")
 	if err == nil || !strings.Contains(err.Error(), "LLM 挂了") {
 		t.Fatalf("工厂错误应向上抛, err=%v", err)
+	}
+}
+
+// fakeTranscriber 按脚本返回识别文本，text 为空串模拟「没听清」。
+type fakeTranscriber struct{ text string }
+
+func (f *fakeTranscriber) Transcribe(_ context.Context, _ io.Reader, _ string) (string, error) {
+	return f.text, nil
+}
+
+// newTestBotWith 注入 fake 转写器的测试机器人（fetcher 传 nil，HandleAudio 不依赖它）。
+func newTestBotWith(t *testing.T, tr Transcriber) (*Bot, *fakeInterview) {
+	t.Helper()
+	fi := &fakeInterview{}
+	b := NewBot(&fakeSender{}, func(_ context.Context, _ string) (Interview, error) {
+		return fi, nil
+	}, 0, WithAudio(nil, tr))
+	return b, fi
+}
+
+func TestAudioAnswer(t *testing.T) {
+	tr := &fakeTranscriber{text: "channel 用于协程间通信"}
+	b, fi := newTestBotWith(t, tr)
+	ctx := context.Background()
+	if _, err := b.HandleText(ctx, "k", "面试 Go 后端"); err != nil {
+		t.Fatal(err)
+	}
+
+	// 语音作答：转写结果前置展示，并进入正常评估管线
+	got, err := b.HandleAudio(ctx, "k", strings.NewReader("fake-opus-bytes"), "voice.ogg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "【语音识别】channel 用于协程间通信") {
+		t.Fatalf("应前置识别结果, got=%q", got)
+	}
+	if !strings.Contains(got, "追问") || fi.answers != 1 {
+		t.Fatalf("识别结果应走作答管线并触发追问, got=%q answers=%d", got, fi.answers)
+	}
+}
+
+func TestAudioVoiceFinishCommand(t *testing.T) {
+	tr := &fakeTranscriber{text: "结束"} // 语音说「结束」也应能出报告
+	b, _ := newTestBotWith(t, tr)
+	ctx := context.Background()
+	if _, err := b.HandleText(ctx, "k", "面试 Go 后端"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := b.HandleAudio(ctx, "k", strings.NewReader("x"), "")
+	if err != nil || !strings.Contains(got, "提前结束") {
+		t.Fatalf("语音指令失败: %q err=%v", got, err)
+	}
+}
+
+func TestAudioEmptyTranscript(t *testing.T) {
+	tr := &fakeTranscriber{text: "  "} // 没听清：友好提示，不进作答管线
+	b, fi := newTestBotWith(t, tr)
+	got, err := b.HandleAudio(context.Background(), "k", strings.NewReader("x"), "")
+	if err != nil || !strings.Contains(got, "没听清") {
+		t.Fatalf("空识别应提示重试, got=%q err=%v", got, err)
+	}
+	if fi.answers != 0 {
+		t.Fatal("没听清的语音不应进入评估管线")
+	}
+}
+
+func TestAudioNotConfigured(t *testing.T) {
+	b, _, _ := newTestBot(t) // 未注入 ASR
+	got, err := b.HandleAudio(context.Background(), "k", strings.NewReader("x"), "")
+	if err != nil || !strings.Contains(got, "没开语音识别") {
+		t.Fatalf("未配置时应优雅拒绝, got=%q err=%v", got, err)
 	}
 }
 

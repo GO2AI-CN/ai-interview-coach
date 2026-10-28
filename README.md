@@ -8,6 +8,7 @@
 - [下篇：接入简历解析，让面试官先读你的简历](docs/2026-10-28-ai-interview-coach-2.md)
 - [第三篇：Web 版 + SSE 流式输出](docs/2026-10-28-ai-interview-coach-3-web.md)
 - [第四篇：接入飞书机器人（长连接，零公网 IP）](docs/2026-10-28-ai-interview-coach-4-feishu.md)
+- [第五篇：语音作答（ASR）+ 网页版语音彩蛋](docs/2026-10-28-ai-interview-coach-5-voice.md)
 
 ## 功能
 
@@ -18,6 +19,7 @@
 - **多轮记忆**：面试状态持久化到 `.coach-state.json`，今天面 3 题，明天 `coach continue` 接着面
 - **网页版**：SSE 流式点评，逐字打出评估（见第三篇）
 - **飞书机器人**：官方长连接接入，群里 @ 机器人即可开考，无需公网 IP（见第四篇）
+- **语音作答**：飞书语音消息自动转文字后走同一评估管线，文字/语音可混答（见第五篇）
 
 ## 快速开始
 
@@ -46,6 +48,11 @@ go run ./cmd/coach web --addr :8080
 export FEISHU_APP_ID=你的AppID
 export FEISHU_APP_SECRET=你的AppSecret
 go run ./cmd/coach bot
+
+# 语音作答（OpenAI 兼容 ASR，默认 SiliconFlow 免费模型）
+export OPENAI_BASE_URL=https://api.siliconflow.cn/v1   # 或其他兼容端点
+export OPENAI_API_KEY=你的Key
+export COACH_ASR_MODEL=FunAudioLLM/SenseVoiceSmall      # 可选
 ```
 
 面试结束后在当前目录生成 `report.md`（各维度得分 + 薄弱点 + 改进建议）。
@@ -59,7 +66,8 @@ internal/llm/     openai-go v3 封装（JSON Schema 模式 + 纯文本模式）
 internal/resume/  PDF 文本提取 + 简历结构化摘要
 internal/report/  评分报告 Markdown 渲染
 internal/web/     网页版 HTTP 服务（SSE 流式）
-internal/bot/     飞书机器人：长连接接入 + 会话路由（IM 适配层）
+internal/bot/     飞书机器人：长连接接入 + 会话路由 + 语音消息（IM 适配层）
+internal/asr/     语音识别：OpenAI 兼容 /v1/audio/transcriptions 封装
 docs/             配套公众号教程
 ```
 

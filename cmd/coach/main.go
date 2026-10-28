@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"ai-interview-coach/internal/asr"
 	"ai-interview-coach/internal/bot"
 	"ai-interview-coach/internal/coach"
 	"ai-interview-coach/internal/llm"
@@ -52,6 +53,7 @@ func usage() {
   OPENAI_API_KEY   API Key（必填）
   OPENAI_BASE_URL  兼容 OpenAI 协议的端点（可选，如 DeepSeek/Kimi）
   COACH_MODEL      模型名（可选，默认 gpt-4o-mini）
+  COACH_ASR_MODEL  语音识别模型（可选，默认 FunAudioLLM/SenseVoiceSmall）
   FEISHU_APP_ID / FEISHU_APP_SECRET  飞书自建应用凭据（bot 命令必填）`)
 }
 
@@ -112,7 +114,11 @@ func run() error {
 		if appID == "" || appSecret == "" {
 			return fmt.Errorf("请先设置环境变量 FEISHU_APP_ID / FEISHU_APP_SECRET")
 		}
-		b := bot.NewBot(bot.NewLarkSender(appID, appSecret), bot.CoachFactory(client), 0)
+		// 语音作答：走 OpenAI 兼容的 /v1/audio/transcriptions，
+		// 默认 SiliconFlow 免费的 SenseVoiceSmall，COACH_ASR_MODEL 可换。
+		sender := bot.NewLarkSender(appID, appSecret)
+		b := bot.NewBot(sender, bot.CoachFactory(client), 0,
+			bot.WithAudio(sender, asr.New(os.Getenv("COACH_ASR_MODEL"))))
 		return b.Run(ctx, appID, appSecret)
 
 	default:
