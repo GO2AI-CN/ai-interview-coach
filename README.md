@@ -9,6 +9,7 @@
 - [第三篇：Web 版 + SSE 流式输出](docs/2026-10-28-ai-interview-coach-3-web.md)
 - [第四篇：接入飞书机器人（长连接，零公网 IP）](docs/2026-10-28-ai-interview-coach-4-feishu.md)
 - [第五篇：语音作答（ASR）+ 网页版语音彩蛋](docs/2026-10-28-ai-interview-coach-5-voice.md)
+- [第六篇：部署 7×24——systemd 守护与成本监控](docs/2026-10-29-ai-interview-coach-6-deploy.md)
 
 ## 功能
 
@@ -20,6 +21,7 @@
 - **网页版**：SSE 流式点评，逐字打出评估（见第三篇）
 - **飞书机器人**：官方长连接接入，群里 @ 机器人即可开考，无需公网 IP（见第四篇）
 - **语音作答**：飞书语音消息自动转文字后走同一评估管线，文字/语音可混答（见第五篇）
+- **成本可见**：每场面试结束报告末尾附 LLM token 消耗（输入/输出分列），配合 systemd unit 可 7×24 部署（见第六篇）
 
 ## 快速开始
 
@@ -62,12 +64,13 @@ export COACH_ASR_MODEL=FunAudioLLM/SenseVoiceSmall      # 可选
 ```
 cmd/coach/        命令行入口（new / continue / web / bot 四个子命令）
 internal/coach/   面试状态机：计划 / 评估 / 追问判断 / 状态持久化
-internal/llm/     openai-go v3 封装（JSON Schema 模式 + 纯文本模式）
+internal/llm/     openai-go v3 封装（JSON Schema 模式 + 纯文本 + 流式 + token 用量统计）
 internal/resume/  PDF 文本提取 + 简历结构化摘要
 internal/report/  评分报告 Markdown 渲染
 internal/web/     网页版 HTTP 服务（SSE 流式）
 internal/bot/     飞书机器人：长连接接入 + 会话路由 + 语音消息（IM 适配层）
 internal/asr/     语音识别：OpenAI 兼容 /v1/audio/transcriptions 封装
+deploy/           systemd unit 文件（7×24 部署，见第六篇）
 docs/             配套公众号教程
 ```
 

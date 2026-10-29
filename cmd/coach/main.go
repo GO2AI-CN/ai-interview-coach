@@ -118,7 +118,8 @@ func run() error {
 		// 默认 SiliconFlow 免费的 SenseVoiceSmall，COACH_ASR_MODEL 可换。
 		sender := bot.NewLarkSender(appID, appSecret)
 		b := bot.NewBot(sender, bot.CoachFactory(client), 0,
-			bot.WithAudio(sender, asr.New(os.Getenv("COACH_ASR_MODEL"))))
+			bot.WithAudio(sender, asr.New(os.Getenv("COACH_ASR_MODEL"))),
+			bot.WithUsageMeter(llmUsageMeter)) // 报告末尾附本场 token 消耗
 		return b.Run(ctx, appID, appSecret)
 
 	default:
@@ -129,9 +130,16 @@ func run() error {
 	return interviewLoop(ctx, it, client)
 }
 
+// llmUsageMeter 把 llm 包的进程级用量快照适配成 bot.UsageMeter。
+func llmUsageMeter() (int64, int64) {
+	u := llm.TotalUsageSnapshot()
+	return u.PromptTokens, u.CompletionTokens
+}
+
 // interviewLoop 逐题问答：作答 → 评估 → 追问 or 下一题 → 最后出报告。
 func interviewLoop(ctx context.Context, it *coach.Interview, client llm.Client) error {
 	in := bufio.NewReader(os.Stdin)
+	start := llm.TotalUsageSnapshot() // 用量快照：算本场花了多少 token
 	for {
 		q := it.CurrentQuestion()
 		if q == nil {
@@ -181,6 +189,9 @@ func interviewLoop(ctx context.Context, it *coach.Interview, client llm.Client) 
 		return err
 	}
 	coach.Clear(coach.DefaultStateFile) // 面试结束，清除状态
+	used := llm.TotalUsageSnapshot().Sub(start)
 	fmt.Printf("面试结束。综合得分 %d/100，报告已写入 report.md\n", rep.Overall)
+	fmt.Printf("本场 LLM 消耗：%d tokens（输入 %d / 输出 %d），按你所用供应商单价换算成本\n",
+		used.TotalTokens, used.PromptTokens, used.CompletionTokens)
 	return nil
 }

@@ -45,13 +45,19 @@ type AudioFetcher interface {
 	Fetch(ctx context.Context, messageID, fileKey string) (io.Reader, string, error)
 }
 
+// UsageMeter 可选：返回进程累计 LLM token 用量（prompt/completion 分列），
+// 用于报告末尾附带本场消耗。传 nil 则不做统计，功能不受影响。
+type UsageMeter func() (prompt, completion int64)
+
 // session 一个用户的一场进行中的面试。
 // mu 把同一用户并发的多条消息串行化，避免把状态机打坏。
 type session struct {
-	it       Interview
-	position string
-	expireAt time.Time
-	mu       sync.Mutex
+	it           Interview
+	position     string
+	expireAt     time.Time
+	mu           sync.Mutex
+	usedPrompt   int64 // 开考时累计用量快照，用于算本场差值
+	usedComplete int64
 }
 
 // Bot IM 面试机器人。零值不可用，用 NewBot 构造。
@@ -60,6 +66,7 @@ type Bot struct {
 	factory  Factory
 	fetcher  AudioFetcher     // 可选：语音消息下载器（飞书资源接口）
 	asr      Transcriber      // 可选：语音转文字；两者都配了才支持语音作答
+	meter    UsageMeter       // 可选：LLM 用量统计，报告末尾附消耗
 	ttl      time.Duration    // 会话闲置多久后作废（默认 2 小时）
 	sessions sync.Map         // key: chatID|senderOpenID -> *session
 	now      func() time.Time // 便于测试控制时间
@@ -75,6 +82,12 @@ func WithAudio(fetcher AudioFetcher, tr Transcriber) Option {
 		b.fetcher = fetcher
 		b.asr = tr
 	}
+}
+
+// WithUsageMeter 注入 LLM 用量统计；开了之后每场面试的报告末尾
+// 会附本场 token 消耗（答得爽也要知道烧了多少）。
+func WithUsageMeter(m UsageMeter) Option {
+	return func(b *Bot) { b.meter = m }
 }
 
 // NewBot 构造机器人。ttl<=0 时默认 2 小时。
@@ -117,6 +130,9 @@ func (b *Bot) HandleText(ctx context.Context, key, text string) (string, error) 
 			return "", fmt.Errorf("生成面试计划失败: %w", err)
 		}
 		s := &session{it: it, position: strings.TrimSpace(pos), expireAt: b.now().Add(b.ttl)}
+		if b.meter != nil {
+			s.usedPrompt, s.usedComplete = b.meter() // 用量快照：本场差值的起点
+		}
 		b.sessions.Store(key, s)
 		return "面试计划已生成：" + it.Question() + "\n\n直接回复你的答案即可。", nil
 	}
@@ -132,7 +148,7 @@ func (b *Bot) HandleText(ctx context.Context, key, text string) (string, error) 
 		if err != nil {
 			return "", err
 		}
-		return "面试已提前结束，评分报告：\n\n" + rep, nil
+		return "面试已提前结束，评分报告：\n\n" + rep + b.usageLine(s), nil
 	}
 
 	// 非指令：必须是进行中的作答
@@ -161,7 +177,17 @@ func (b *Bot) HandleText(ctx context.Context, key, text string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	return feedback + "\n\n面试结束 🎉 评分报告：\n\n" + rep, nil
+	return feedback + "\n\n面试结束 🎉 评分报告：\n\n" + rep + b.usageLine(s), nil
+}
+
+// usageLine 报告末尾的本场用量说明；未注入统计时返回空串。
+func (b *Bot) usageLine(s *session) string {
+	if b.meter == nil {
+		return ""
+	}
+	p, c := b.meter()
+	return fmt.Sprintf("\n\n———\n本场 LLM 消耗：%d tokens（输入 %d / 输出 %d）",
+		p+c-s.usedPrompt-s.usedComplete, p-s.usedPrompt, c-s.usedComplete)
 }
 
 // HandleAudio 处理一条语音作答：先 ASR 转文字，再走与文字消息完全

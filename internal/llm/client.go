@@ -60,17 +60,26 @@ func (c *OpenAIClient) ChatText(ctx context.Context, system, user string) (strin
 	if len(resp.Choices) == 0 {
 		return "", fmt.Errorf("chat: empty choices")
 	}
+	globalUsage.add(resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
 	return resp.Choices[0].Message.Content, nil
 }
 
 // ChatStream 流式输出：SSE 逐 chunk 读取，边读边回调，用户体验"字往外蹦"。
 func (c *OpenAIClient) ChatStream(ctx context.Context, system, user string, onToken func(string)) (string, error) {
-	stream := c.cli.Chat.Completions.NewStreaming(ctx, c.chatParams(system, user))
+	params := c.chatParams(system, user)
+	// 流式的 usage 只在最后一个 chunk 里且默认不带，要显式开启
+	params.StreamOptions = openai.ChatCompletionStreamOptionsParam{
+		IncludeUsage: param.NewOpt(true),
+	}
+	stream := c.cli.Chat.Completions.NewStreaming(ctx, params)
 	defer stream.Close()
 
 	var full strings.Builder
 	for stream.Next() {
 		chunk := stream.Current()
+		if chunk.JSON.Usage.Valid() { // 最后一个 chunk：整场请求的用量
+			globalUsage.add(chunk.Usage.PromptTokens, chunk.Usage.CompletionTokens)
+		}
 		for _, choice := range chunk.Choices {
 			if tok := choice.Delta.Content; tok != "" {
 				full.WriteString(tok)
@@ -107,6 +116,7 @@ func (c *OpenAIClient) ChatJSON(ctx context.Context, system, user, schemaName, s
 	if len(resp.Choices) == 0 {
 		return fmt.Errorf("chat json: empty choices")
 	}
+	globalUsage.add(resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
 	if err := json.Unmarshal([]byte(resp.Choices[0].Message.Content), out); err != nil {
 		return fmt.Errorf("parse json output: %w (raw=%.120s)", err, resp.Choices[0].Message.Content)
 	}

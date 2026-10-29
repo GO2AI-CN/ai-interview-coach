@@ -41,13 +41,13 @@ func (f *fakeInterview) Finish(_ context.Context) (string, error) {
 	return "# 评分报告\n综合得分：80/100", nil
 }
 
-func newTestBot(t *testing.T) (*Bot, *fakeInterview, *fakeSender) {
+func newTestBot(t *testing.T, opts ...Option) (*Bot, *fakeInterview, *fakeSender) {
 	t.Helper()
 	fi := &fakeInterview{}
 	fs := &fakeSender{}
 	b := NewBot(fs, func(_ context.Context, _ string) (Interview, error) {
 		return fi, nil
-	}, 0)
+	}, 0, opts...)
 	return b, fi, fs
 }
 
@@ -244,6 +244,43 @@ func TestAudioNotConfigured(t *testing.T) {
 	got, err := b.HandleAudio(context.Background(), "k", strings.NewReader("x"), "")
 	if err != nil || !strings.Contains(got, "没开语音识别") {
 		t.Fatalf("未配置时应优雅拒绝, got=%q err=%v", got, err)
+	}
+}
+
+func TestUsageMeterInReport(t *testing.T) {
+	// fake 计量器：每次调用 completion +50，模拟面试过程中的消耗
+	var completion int64
+	b, _, _ := newTestBot(t, WithUsageMeter(func() (int64, int64) {
+		return 0, completion
+	}))
+	ctx := context.Background()
+	if _, err := b.HandleText(ctx, "k", "面试 Go"); err != nil {
+		t.Fatal(err)
+	}
+	completion = 50 // 开考后「发生」了消耗
+
+	// 提前结束：报告末尾应附本场消耗
+	got, err := b.HandleText(ctx, "k", "结束")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "本场 LLM 消耗：50 tokens") {
+		t.Fatalf("报告应附本场用量, got=%q", got)
+	}
+}
+
+func TestUsageMeterOptional(t *testing.T) {
+	b, _, _ := newTestBot(t) // 未注入 meter：报告不带用量行，功能照常
+	ctx := context.Background()
+	if _, err := b.HandleText(ctx, "k", "面试 Go"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := b.HandleText(ctx, "k", "结束")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got, "本场 LLM 消耗") {
+		t.Fatalf("未注入 meter 不应出现用量行, got=%q", got)
 	}
 }
 

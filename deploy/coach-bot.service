@@ -1,0 +1,31 @@
+# AI 模拟面试教练——飞书机器人服务（systemd）
+#
+# 安装：
+#   sudo cp deploy/coach-bot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now coach-bot
+#
+# 排障：journalctl -u coach-bot -f   （崩溃重启记录：journalctl -u coach-bot --list-boots 或直接看日志里的启动行）
+
+[Unit]
+Description=AI Interview Coach Feishu Bot
+# 长连接要联网，等网络就绪再启动，避免开机自启时连不上飞书
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=coach
+WorkingDirectory=/opt/ai-interview-coach
+# 全部秘钥走环境文件，权限 600，不进命令行历史、不进 systemd 日志
+EnvironmentFile=/opt/ai-interview-coach/coach.env
+ExecStart=/opt/ai-interview-coach/coach bot
+# 守护核心：进程退出（含 panic、OOM 被杀）5 秒后拉起；疯狂崩溃时由 OnFailure 告警
+Restart=always
+RestartSec=5
+# 日志交 journald，统一 journalctl 查看；应用自身只往 stderr 打
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
