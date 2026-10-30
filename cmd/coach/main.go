@@ -27,9 +27,14 @@ import (
 	"ai-interview-coach/internal/report"
 	"ai-interview-coach/internal/resume"
 	"ai-interview-coach/internal/web"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// 本地开发从 .env 读配置；生产部署由 systemd EnvironmentFile 注入。
+	_ = godotenv.Load()
+
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(1)
@@ -54,6 +59,8 @@ func usage() {
   OPENAI_BASE_URL  兼容 OpenAI 协议的端点（可选，如 DeepSeek/Kimi）
   COACH_MODEL      模型名（可选，默认 gpt-4o-mini）
   COACH_ASR_MODEL  语音识别模型（可选，默认 FunAudioLLM/SenseVoiceSmall）
+  COACH_ASR_API_KEY / COACH_ASR_BASE_URL  ASR 单独凭据（可选，默认同 OPENAI_*；
+                     对话与 ASR 不同供应商时必配，如对话 DeepSeek + ASR SiliconFlow）
   FEISHU_APP_ID / FEISHU_APP_SECRET  飞书自建应用凭据（bot 命令必填）`)
 }
 
@@ -167,7 +174,14 @@ func interviewLoop(ctx context.Context, it *coach.Interview, client llm.Client) 
 		if err != nil {
 			return err
 		}
-		ev := it.State.Pending.Evaluation
+		// 追问次数到顶后 Answer 会推进到下一题并把 Pending 置 nil，
+		// 评估结果随之落在 Done 的最后一轮里。
+		var ev coach.Evaluation
+		if it.State.Pending != nil {
+			ev = it.State.Pending.Evaluation
+		} else if n := len(it.State.Done); n > 0 {
+			ev = it.State.Done[n-1].Evaluation
+		}
 		fmt.Printf("  评估：置信度 %d/5，要点覆盖 %.0f%%，%s\n", ev.Confidence, ev.Coverage*100, ev.Suggestion)
 		if err := coach.Save(it.State, coach.DefaultStateFile); err != nil {
 			return err

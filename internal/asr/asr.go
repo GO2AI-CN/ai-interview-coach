@@ -8,8 +8,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 )
 
 // Transcriber 语音转文字的最小抽象，测试时替换为 fake。
@@ -28,11 +30,21 @@ type OpenAI struct {
 }
 
 // New 构造转写器。model 为空时用 SiliconFlow 免费的 SenseVoiceSmall。
+// 凭据默认复用 OPENAI_API_KEY / OPENAI_BASE_URL；若对话模型与 ASR 不在
+// 同一家（如对话走 DeepSeek、ASR 走 SiliconFlow），用 COACH_ASR_API_KEY /
+// COACH_ASR_BASE_URL 单独指定。
 func New(model string) *OpenAI {
 	if model == "" {
 		model = "FunAudioLLM/SenseVoiceSmall" // 硅基流动免费 ASR 模型
 	}
-	return &OpenAI{cli: openai.NewClient(), model: model}
+	opts := []option.RequestOption{}
+	if k := os.Getenv("COACH_ASR_API_KEY"); k != "" {
+		opts = append(opts, option.WithAPIKey(k))
+	}
+	if u := os.Getenv("COACH_ASR_BASE_URL"); u != "" {
+		opts = append(opts, option.WithBaseURL(u))
+	}
+	return &OpenAI{cli: openai.NewClient(opts...), model: model}
 }
 
 // Transcribe 调 POST /v1/audio/transcriptions，multipart 上传音频。

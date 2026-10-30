@@ -95,6 +95,8 @@ func (c *OpenAIClient) ChatStream(ctx context.Context, system, user string, onTo
 	return full.String(), nil
 }
 
+// ChatJSON 优先用 strict JSON Schema 约束输出；部分端点（如 DeepSeek）不支持
+// json_schema，会返回 400，此时按 json_object → 纯提示词两级降级，保证兼容。
 func (c *OpenAIClient) ChatJSON(ctx context.Context, system, user, schemaName, schemaDesc string, schema any, out any) error {
 	resp, err := c.cli.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model:    shared.ChatModel(c.model),
@@ -110,6 +112,33 @@ func (c *OpenAIClient) ChatJSON(ctx context.Context, system, user, schemaName, s
 			},
 		},
 	})
+	// 降级时端点看不到 schema 参数，要把 Schema 以文本形式补进提示词，
+	// 否则模型不知道有哪些字段（dimension 等就会出现空值）。
+	schemaText, _ := json.MarshalIndent(schema, "", "  ")
+	jsonRule := "\n\n只输出一个 JSON 对象，不要输出任何其他文字、解释或 Markdown 代码块。输出必须符合这个 JSON Schema：\n" + string(schemaText)
+
+	if err != nil {
+		// 降级 1：json_object（DeepSeek 等端点支持这种，但不支持 json_schema）
+		resp, err = c.cli.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+			Model: shared.ChatModel(c.model),
+			Messages: []openai.ChatCompletionMessageParamUnion{
+				openai.SystemMessage(system + jsonRule),
+				openai.UserMessage(user),
+			},
+			ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
+				OfJSONObject: &shared.ResponseFormatJSONObjectParam{},
+			},
+		})
+	}
+	if err != nil {
+		// 降级 2：纯提示词约束，端点连 json_object 都不支持时兜底。
+		// 走 ChatText（usage 在其中累计），拿到文本后统一走下面的解析。
+		var text string
+		text, err = c.ChatText(ctx, system+jsonRule, user)
+		if err == nil {
+			return unmarshalJSONContent(text, out)
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("chat json: %w", err)
 	}
@@ -117,8 +146,21 @@ func (c *OpenAIClient) ChatJSON(ctx context.Context, system, user, schemaName, s
 		return fmt.Errorf("chat json: empty choices")
 	}
 	globalUsage.add(resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
-	if err := json.Unmarshal([]byte(resp.Choices[0].Message.Content), out); err != nil {
-		return fmt.Errorf("parse json output: %w (raw=%.120s)", err, resp.Choices[0].Message.Content)
+	return unmarshalJSONContent(resp.Choices[0].Message.Content, out)
+}
+
+// unmarshalJSONContent 解析模型输出的 JSON；模型偶尔会在 JSON 外面包
+// ```json 代码块或加几句解释，这里做一次宽容提取。
+func unmarshalJSONContent(content string, out any) error {
+	s := strings.TrimSpace(content)
+	if i := strings.Index(s, "{"); i > 0 { // 去掉 JSON 前可能存在的解释文字或 ```json 围栏
+		s = s[i:]
+	}
+	if strings.HasSuffix(s, "```") { // 去掉结尾围栏
+		s = strings.TrimSpace(strings.TrimSuffix(s, "```"))
+	}
+	if err := json.Unmarshal([]byte(s), out); err != nil {
+		return fmt.Errorf("parse json output: %w (raw=%.120s)", err, s)
 	}
 	return nil
 }
