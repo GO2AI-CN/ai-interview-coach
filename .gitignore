@@ -1,3 +1,5 @@
 .coach-state.json
 report.md
 *.exe
+.idea
+.env
