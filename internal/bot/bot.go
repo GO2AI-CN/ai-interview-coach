@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +50,44 @@ type AudioFetcher interface {
 // 用于报告末尾附带本场消耗。传 nil 则不做统计，功能不受影响。
 type UsageMeter func() (prompt, completion int64)
 
+// Turn 一场面试里一题的完整记录（落库用）。
+type Turn struct {
+	Dimension  string  // 能力维度
+	Question   string  // 题目（含追问改写后的最终文本）
+	Answer     string  // 用户最终一次作答
+	Confidence int     // 评估置信度 1-5
+	Coverage   float64 // 要点覆盖度 0-1
+	FollowUps  int     // 本题被追问了几次
+}
+
+// Recorder 可选：面试状态机实现此接口后，bot 才能把整场记录交给 Store。
+// internal/coach 的适配器（lark.go 里的 coachInterview）实现了它；
+// fake  Interview 不实现也不影响任何现有功能。
+type Recorder interface {
+	// Record 返回落库所需的整场数据。overall 由 Finish 内部顺带记录。
+	Record() (position string, overall int, turns []Turn)
+}
+
+// HistoryItem 「历史」列表里的一行摘要。
+type HistoryItem struct {
+	ID        int64     // 落库主键，查看报告用
+	Position  string    // 目标岗位
+	Overall   int       // 综合得分 0-100
+	CreatedAt time.Time // 本场结束时间
+}
+
+// Store 面试历史的持久化（可选注入，nil 则历史功能整体关闭）。
+// 实现见 internal/store（SQLite）；接口定义在 bot 侧，
+// 让存储实现依赖 bot 的抽象，而不是反过来。
+type Store interface {
+	// Save 一场完整面试：汇总 + 每题问答，返回落库 ID。
+	Save(ctx context.Context, key, position string, overall int, reportMD string, turns []Turn) (int64, error)
+	// Recent 该会话最近的 limit 场面试（新的在前）。
+	Recent(ctx context.Context, key string, limit int) ([]HistoryItem, error)
+	// Report 按 ID 取回完整 Markdown 报告；key 不匹配返回错误，防止跨会话串报告。
+	Report(ctx context.Context, key string, id int64) (string, error)
+}
+
 // session 一个用户的一场进行中的面试。
 // mu 把同一用户并发的多条消息串行化，避免把状态机打坏。
 type session struct {
@@ -67,8 +106,10 @@ type Bot struct {
 	fetcher  AudioFetcher     // 可选：语音消息下载器（飞书资源接口）
 	asr      Transcriber      // 可选：语音转文字；两者都配了才支持语音作答
 	meter    UsageMeter       // 可选：LLM 用量统计，报告末尾附消耗
+	store    Store            // 可选：面试历史落库；配了才有「历史」指令
 	ttl      time.Duration    // 会话闲置多久后作废（默认 2 小时）
 	sessions sync.Map         // key: chatID|senderOpenID -> *session
+	history  sync.Map         // key -> []HistoryItem：最近一次「历史」列表，供「历史 N」选序号
 	now      func() time.Time // 便于测试控制时间
 }
 
@@ -90,6 +131,12 @@ func WithUsageMeter(m UsageMeter) Option {
 	return func(b *Bot) { b.meter = m }
 }
 
+// WithStore 注入面试历史存储；开了之后报告自动生成时落库，
+// 用户可用「历史」回看最近几场、用「历史 N」调取第 N 场完整报告。
+func WithStore(s Store) Option {
+	return func(b *Bot) { b.store = s }
+}
+
 // NewBot 构造机器人。ttl<=0 时默认 2 小时。
 func NewBot(sender Sender, factory Factory, ttl time.Duration, opts ...Option) *Bot {
 	if ttl <= 0 {
@@ -105,6 +152,8 @@ func NewBot(sender Sender, factory Factory, ttl time.Duration, opts ...Option) *
 const helpText = `我是 AI 模拟面试教练 🤖 指令如下：
   面试 <目标岗位>   开一场新面试（如：面试 Go 后端工程师）
   结束              提前结束并出评分报告
+  历史              查看最近几场面试（含得分）
+  历史 <序号>       查看某一场的完整评分报告
   帮助              显示本说明
 开考后文字、语音作答都可以；我会先语音转文字（回复里会附上识别结果），
 再逐题评估，答得浅会自动追问。`
@@ -121,6 +170,11 @@ func (b *Bot) HandleText(ctx context.Context, key, text string) (string, error) 
 	// 指令：帮助
 	if text == "帮助" || text == "help" {
 		return helpText, nil
+	}
+
+	// 指令：历史（列表 / 按序号取报告）
+	if reply, ok := b.handleHistory(ctx, key, text); ok {
+		return reply, nil
 	}
 
 	// 指令：开新面试
@@ -148,7 +202,7 @@ func (b *Bot) HandleText(ctx context.Context, key, text string) (string, error) 
 		if err != nil {
 			return "", err
 		}
-		return "面试已提前结束，评分报告：\n\n" + rep + b.usageLine(s), nil
+		return "面试已提前结束，评分报告：\n\n" + rep + b.usageLine(s) + b.saveHistory(ctx, key, s, rep), nil
 	}
 
 	// 非指令：必须是进行中的作答
@@ -177,7 +231,77 @@ func (b *Bot) HandleText(ctx context.Context, key, text string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	return feedback + "\n\n面试结束 🎉 评分报告：\n\n" + rep + b.usageLine(s), nil
+	return feedback + "\n\n面试结束 🎉 评分报告：\n\n" + rep + b.usageLine(s) + b.saveHistory(ctx, key, s, rep), nil
+}
+
+// handleHistory 处理「历史」和「历史 N」。第二个返回值表示是否命中指令。
+// IM 列表交互的经典做法：先给带序号的列表并缓存，用户回复序号即可定位。
+func (b *Bot) handleHistory(ctx context.Context, key, text string) (string, bool) {
+	if text != "历史" {
+		nStr, ok := strings.CutPrefix(text, "历史 ")
+		if !ok {
+			return "", false
+		}
+		if b.store == nil {
+			return "历史功能未开启。", true
+		}
+		return b.historyReport(ctx, key, strings.TrimSpace(nStr)), true
+	}
+	if b.store == nil {
+		return "历史功能未开启。", true
+	}
+	items, err := b.store.Recent(ctx, key, 5)
+	if err != nil {
+		return "查询历史失败：" + err.Error(), true
+	}
+	if len(items) == 0 {
+		return "还没有面试记录，输入「面试 <目标岗位>」开始第一场～", true
+	}
+	b.history.Store(key, items)
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("📋 最近 %d 场面试：\n", len(items)))
+	for i, it := range items {
+		fmt.Fprintf(&sb, "%d. %s · 综合 %d 分 · %s\n",
+			i+1, it.Position, it.Overall, it.CreatedAt.Format("01-02 15:04"))
+	}
+	sb.WriteString("\n回复「历史 序号」查看对应完整报告。")
+	return sb.String(), true
+}
+
+// historyReport 按序号取报告；序号来自最近一次「历史」列表的缓存。
+func (b *Bot) historyReport(ctx context.Context, key, nStr string) string {
+	v, ok := b.history.Load(key)
+	if !ok {
+		return "请先回复「历史」获取列表，再回复「历史 序号」选择。"
+	}
+	n, err := strconv.Atoi(nStr)
+	if err != nil || n < 1 || n > len(v.([]HistoryItem)) {
+		return "序号无效，请先回复「历史」获取最新列表。"
+	}
+	item := v.([]HistoryItem)[n-1]
+	rep, err := b.store.Report(ctx, key, item.ID)
+	if err != nil {
+		return "查询报告失败：" + err.Error() // 报告可能已被清理，按提示处理即可
+	}
+	return fmt.Sprintf("📄 %s · 综合 %d 分 · %s\n\n%s",
+		item.Position, item.Overall, item.CreatedAt.Format("01-02 15:04"), rep)
+}
+
+// saveHistory 报告落库。失败不阻塞回复（报告正文已经发出），只附一行警告。
+// 状态机实现了 Recorder 才落库；返回追加在报告末尾的说明文字。
+func (b *Bot) saveHistory(ctx context.Context, key string, s *session, reportMD string) string {
+	if b.store == nil {
+		return ""
+	}
+	rec, ok := s.it.(Recorder)
+	if !ok {
+		return ""
+	}
+	pos, overall, turns := rec.Record()
+	if _, err := b.store.Save(ctx, key, pos, overall, reportMD, turns); err != nil {
+		return "\n\n（⚠️ 本场历史落库失败：" + err.Error() + "）"
+	}
+	return "\n\n本场记录已存入历史，回复「历史」随时回看。"
 }
 
 // usageLine 报告末尾的本场用量说明；未注入统计时返回空串。

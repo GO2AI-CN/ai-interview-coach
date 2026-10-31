@@ -10,6 +10,8 @@
 - [第四篇：接入飞书机器人（长连接，零公网 IP）](docs/2026-10-28-ai-interview-coach-4-feishu.md)
 - [第五篇：语音作答（ASR）+ 网页版语音彩蛋](docs/2026-10-28-ai-interview-coach-5-voice.md)
 - [第六篇：部署 7×24——systemd 守护与成本监控](docs/2026-10-29-ai-interview-coach-6-deploy.md)
+- [第七篇：面试历史落库（SQLite）——「历史」指令回看既往报告](docs/2026-10-31-ai-interview-coach-7-sqlite.md)
+- [第八篇·收官：架构回顾与「fork 改造成你的 Agent」路线图](docs/2026-10-31-ai-interview-coach-8-finale.md)
 
 ## 功能
 
@@ -22,6 +24,7 @@
 - **飞书机器人**：官方长连接接入，群里 @ 机器人即可开考，无需公网 IP（见第四篇）
 - **语音作答**：飞书语音消息自动转文字后走同一评估管线，文字/语音可混答（见第五篇）
 - **成本可见**：每场面试结束报告末尾附 LLM token 消耗（输入/输出分列），配合 systemd unit 可 7×24 部署（见第六篇）
+- **面试历史**：每场问答、评估、报告落库 SQLite（纯 Go，无 CGO），飞书发「历史」回看最近场次、「历史 N」调取完整报告（见第七篇）
 
 ## 快速开始
 
@@ -55,6 +58,9 @@ go run ./cmd/coach bot
 export OPENAI_BASE_URL=https://api.siliconflow.cn/v1   # 或其他兼容端点
 export OPENAI_API_KEY=你的Key
 export COACH_ASR_MODEL=FunAudioLLM/SenseVoiceSmall      # 可选
+
+# 面试历史落库（飞书「历史」指令；不设则关闭）
+export COACH_DB_PATH=./coach.db
 ```
 
 面试结束后在当前目录生成 `report.md`（各维度得分 + 薄弱点 + 改进建议）。
@@ -70,6 +76,7 @@ internal/report/  评分报告 Markdown 渲染
 internal/web/     网页版 HTTP 服务（SSE 流式）
 internal/bot/     飞书机器人：长连接接入 + 会话路由 + 语音消息（IM 适配层）
 internal/asr/     语音识别：OpenAI 兼容 /v1/audio/transcriptions 封装
+internal/store/   面试历史落库：SQLite（modernc.org/sqlite，纯 Go 无 CGO）
 deploy/           systemd unit 文件（7×24 部署，见第六篇）
 docs/             配套公众号教程
 ```

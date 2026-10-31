@@ -89,7 +89,8 @@ func CoachFactory(client llm.Client) Factory {
 // coachInterview 是 coach.Interview → bot.Interview 的适配器，
 // 负责把「状态机语言」翻译成「IM 回复语言」（评估摘要 + 追问/下一题）。
 type coachInterview struct {
-	it *coach.Interview
+	it          *coach.Interview
+	lastOverall int // Finish 时顺带记下综合分，供 Record() 落库
 }
 
 func (c *coachInterview) Question() string {
@@ -122,7 +123,33 @@ func (c *coachInterview) Finish(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	c.lastOverall = rep.Overall
 	return report.Markdown(rep), nil
+}
+
+// Record 实现 bot.Recorder：把状态机里的整场记录翻译成落库结构。
+// 已完成的题在 Done 里；「结束」指令打断时最后一题可能还挂在 Pending
+// （已作答、已评估），一并入库，保证报告和明细对得上。
+func (c *coachInterview) Record() (string, int, []Turn) {
+	st := c.it.State
+	turns := make([]Turn, 0, len(st.Done)+1)
+	appendTurn := func(t coach.Turn) {
+		turns = append(turns, Turn{
+			Dimension:  t.Question.Dimension,
+			Question:   t.Question.Question,
+			Answer:     t.Answer,
+			Confidence: t.Evaluation.Confidence,
+			Coverage:   t.Evaluation.Coverage,
+			FollowUps:  t.FollowUps,
+		})
+	}
+	for _, t := range st.Done {
+		appendTurn(t)
+	}
+	if st.Pending != nil && st.Pending.Answer != "" {
+		appendTurn(*st.Pending)
+	}
+	return st.Position, c.lastOverall, turns
 }
 
 // fmtQuestion 给题目加上进度和维度标签，IM 里一眼看清进度。

@@ -26,6 +26,7 @@ import (
 	"ai-interview-coach/internal/llm"
 	"ai-interview-coach/internal/report"
 	"ai-interview-coach/internal/resume"
+	"ai-interview-coach/internal/store"
 	"ai-interview-coach/internal/web"
 
 	"github.com/joho/godotenv"
@@ -61,6 +62,7 @@ func usage() {
   COACH_ASR_MODEL  语音识别模型（可选，默认 FunAudioLLM/SenseVoiceSmall）
   COACH_ASR_API_KEY / COACH_ASR_BASE_URL  ASR 单独凭据（可选，默认同 OPENAI_*；
                      对话与 ASR 不同供应商时必配，如对话 DeepSeek + ASR SiliconFlow）
+  COACH_DB_PATH    面试历史 SQLite 文件路径（可选，如 ./coach.db，不设则关闭历史功能）
   FEISHU_APP_ID / FEISHU_APP_SECRET  飞书自建应用凭据（bot 命令必填）`)
 }
 
@@ -124,9 +126,22 @@ func run() error {
 		// 语音作答：走 OpenAI 兼容的 /v1/audio/transcriptions，
 		// 默认 SiliconFlow 免费的 SenseVoiceSmall，COACH_ASR_MODEL 可换。
 		sender := bot.NewLarkSender(appID, appSecret)
-		b := bot.NewBot(sender, bot.CoachFactory(client), 0,
+		opts := []bot.Option{
 			bot.WithAudio(sender, asr.New(os.Getenv("COACH_ASR_MODEL"))),
-			bot.WithUsageMeter(llmUsageMeter)) // 报告末尾附本场 token 消耗
+			bot.WithUsageMeter(llmUsageMeter), // 报告末尾附本场 token 消耗
+		}
+		// 面试历史落库：设了 COACH_DB_PATH（如 ./coach.db）才开启，
+		// 开启后用户可用「历史」指令回看既往报告。
+		if dbPath := os.Getenv("COACH_DB_PATH"); dbPath != "" {
+			st, err := store.Open(dbPath)
+			if err != nil {
+				return fmt.Errorf("打开历史数据库失败: %w", err)
+			}
+			defer st.Close()
+			opts = append(opts, bot.WithStore(st))
+			fmt.Printf("[bot] 面试历史落库已开启：%s\n", dbPath)
+		}
+		b := bot.NewBot(sender, bot.CoachFactory(client), 0, opts...)
 		return b.Run(ctx, appID, appSecret)
 
 	default:
