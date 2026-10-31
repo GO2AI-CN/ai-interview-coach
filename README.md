@@ -13,6 +13,11 @@
 - [第七篇：面试历史落库（SQLite）——「历史」指令回看既往报告](docs/2026-10-31-ai-interview-coach-7-sqlite.md)
 - [第八篇·收官：架构回顾与「fork 改造成你的 Agent」路线图](docs/2026-10-31-ai-interview-coach-8-finale.md)
 
+第二系列「MCP 协议与 Agent 工程化」（预告：把面试教练的 SQLite 历史库包装成 MCP 服务）：
+
+- [系列第 1 篇：为什么大模型需要 MCP？一篇讲透 Agent 工具的 USB-C 接口](docs/2026-10-31-go-mcp-1-intro.md)
+- [系列第 2 篇：不写一行 SDK，200 行 Go 手写 MCP Server 全解析](docs/2026-10-31-go-mcp-2-minimal-server.md)
+
 ## 功能
 
 - **面试计划**：基于岗位能力模型（rubric）一次性生成 5~8 题，每题带可验证的考察要点（checkpoints）
@@ -78,6 +83,7 @@ internal/bot/     飞书机器人：长连接接入 + 会话路由 + 语音消�
 internal/asr/     语音识别：OpenAI 兼容 /v1/audio/transcriptions 封装
 internal/store/   面试历史落库：SQLite（modernc.org/sqlite，纯 Go 无 CGO）
 deploy/           systemd unit 文件（7×24 部署，见第六篇）
+mcp/minimal/      第二系列：不依赖 SDK 的最小 MCP Server（JSON-RPC 2.0 + stdio）
 docs/             配套公众号教程
 ```
 
