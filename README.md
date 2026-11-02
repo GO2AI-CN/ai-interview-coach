@@ -20,6 +20,7 @@
 - [系列第 3 篇：MCP 进阶：Tools 与 Resources 实战](docs/2026-11-02-go-mcp-3-tools-resources.md)
 - [系列第 4 篇：把面试教练的历史库包装成 MCP 服务（上）](docs/2026-11-02-go-mcp-4-coachstore-server.md)
 - [系列第 5 篇：MCP 函数调用循环：让模型自己决定调工具](docs/2026-11-02-go-mcp-5-client-loop.md)
+- [系列第 6 篇：Sampling：让 server 反向请求你的大模型](docs/2026-11-02-go-mcp-6-prompts-sampling-roots.md)
 
 ## 功能
 
@@ -90,6 +91,7 @@ mcp/minimal/      第二系列：不依赖 SDK 的最小 MCP Server（JSON-RPC 2
 mcp/toolsdemo/    第二系列：进阶版——工具注册表 + 参数校验 + Resources 资料库
 mcp/coachstore/   第二系列：面试历史 SQLite 库的只读 MCP 服务（query_only 物理禁写）
 mcp/coachclient/  第二系列：手写 MCP client + 函数调用循环（LLM 接口可插拔）
+mcp/extras/       第二系列：双向请求演示——Prompts / Sampling（已废弃，仅教学）/ Roots
 docs/             配套公众号教程
 ```
 
