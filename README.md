@@ -17,6 +17,9 @@
 
 - [系列第 1 篇：为什么大模型需要 MCP？一篇讲透 Agent 工具的 USB-C 接口](docs/2026-10-31-go-mcp-1-intro.md)
 - [系列第 2 篇：不写一行 SDK，200 行 Go 手写 MCP Server 全解析](docs/2026-10-31-go-mcp-2-minimal-server.md)
+- [系列第 3 篇：MCP 进阶：Tools 与 Resources 实战](docs/2026-11-02-go-mcp-3-tools-resources.md)
+- [系列第 4 篇：把面试教练的历史库包装成 MCP 服务（上）](docs/2026-11-02-go-mcp-4-coachstore-server.md)
+- [系列第 5 篇：MCP 函数调用循环：让模型自己决定调工具](docs/2026-11-02-go-mcp-5-client-loop.md)
 
 ## 功能
 
@@ -84,6 +87,9 @@ internal/asr/     语音识别：OpenAI 兼容 /v1/audio/transcriptions 封装
 internal/store/   面试历史落库：SQLite（modernc.org/sqlite，纯 Go 无 CGO）
 deploy/           systemd unit 文件（7×24 部署，见第六篇）
 mcp/minimal/      第二系列：不依赖 SDK 的最小 MCP Server（JSON-RPC 2.0 + stdio）
+mcp/toolsdemo/    第二系列：进阶版——工具注册表 + 参数校验 + Resources 资料库
+mcp/coachstore/   第二系列：面试历史 SQLite 库的只读 MCP 服务（query_only 物理禁写）
+mcp/coachclient/  第二系列：手写 MCP client + 函数调用循环（LLM 接口可插拔）
 docs/             配套公众号教程
 ```
 
