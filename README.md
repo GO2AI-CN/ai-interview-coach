@@ -24,6 +24,10 @@
 - [系列第 7 篇：远程 MCP 实战：HTTP/SSE 传输与鉴权全解析](docs/2026-11-04-go-mcp-7-remote-http.md)
 - [系列第 8 篇·收官：官方 SDK、社区库与服务器注册表全景](docs/2026-11-05-go-mcp-8-finale.md)
 
+第三系列「RAG 与向量检索」（实战项目：把本仓库 docs/ 16 篇文章 ingest 成带引用出处的 Go 文档问答助手）：
+
+- [系列第 1 篇：大模型为什么总胡说八道？RAG 实战第一讲](docs/2026-11-06-go-rag-1-intro.md)
+
 ## 功能
 
 - **面试计划**：基于岗位能力模型（rubric）一次性生成 5~8 题，每题带可验证的考察要点（checkpoints）
@@ -95,6 +99,7 @@ mcp/coachstore/   第二系列：面试历史 SQLite 库的只读 MCP 服务（q
 mcp/coachclient/  第二系列：手写 MCP client + 函数调用循环（LLM 接口可插拔）
 mcp/extras/       第二系列：双向请求演示——Prompts / Sampling（已废弃，仅教学）/ Roots
 mcp/remote/       第二系列：Streamable HTTP 传输（POST/GET + SSE + 会话与鉴权）
+rag/cmd/embeddemo/ 第三系列：零依赖教学 demo——字符 bigram 手写 embedding + 暴力余弦检索
 docs/             配套公众号教程
 ```
 
