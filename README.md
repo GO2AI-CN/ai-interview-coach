@@ -22,6 +22,7 @@
 - [系列第 5 篇：MCP 函数调用循环：让模型自己决定调工具](docs/2026-11-02-go-mcp-5-client-loop.md)
 - [系列第 6 篇：Sampling：让 server 反向请求你的大模型](docs/2026-11-02-go-mcp-6-prompts-sampling-roots.md)
 - [系列第 7 篇：远程 MCP 实战：HTTP/SSE 传输与鉴权全解析](docs/2026-11-04-go-mcp-7-remote-http.md)
+- [系列第 8 篇·收官：官方 SDK、社区库与服务器注册表全景](docs/2026-11-05-go-mcp-8-finale.md)
 
 ## 功能
 
