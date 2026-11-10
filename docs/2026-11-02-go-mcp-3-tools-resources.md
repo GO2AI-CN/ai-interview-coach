@@ -127,7 +127,7 @@ case "resources/read": // 按 uri 查库，返回 {contents: [{uri, mimeType, te
 
 **下篇预告**：把我们的 AI 面试教练的 SQLite 历史库包装成 MCP 服务——`list_sessions`、`get_report` 两个工具直接复用 `internal/store`，面试官 Agent 从此「记得」每一位候选人。没看过第一系列也不影响，下篇会把需要的背景补全。
 
-觉得有用的话，欢迎点赞、在看、转发，关注「GO语言入门之路」，后面还有 5 篇 MCP 实战在路上。
+觉得有用的话，欢迎点赞、在看、转发，关注「Go2AI之路」，后面还有 5 篇 MCP 实战在路上。
 
 ---
 

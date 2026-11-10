@@ -27,6 +27,7 @@
 第三系列「RAG 与向量检索」（实战项目：把本仓库 docs/ 16 篇文章 ingest 成带引用出处的 Go 文档问答助手）：
 
 - [系列第 1 篇：大模型为什么总胡说八道？RAG 实战第一讲](docs/2026-11-06-go-rag-1-intro.md)
+- [系列第 2 篇：向量 Embedding 实战：Go 调用与模型选型](docs/2026-11-10-go-rag-2-embedding-api.md)
 
 ## 功能
 
@@ -100,6 +101,8 @@ mcp/coachclient/  第二系列：手写 MCP client + 函数调用循环（LLM �
 mcp/extras/       第二系列：双向请求演示——Prompts / Sampling（已废弃，仅教学）/ Roots
 mcp/remote/       第二系列：Streamable HTTP 传输（POST/GET + SSE + 会话与鉴权）
 rag/cmd/embeddemo/ 第三系列：零依赖教学 demo——字符 bigram 手写 embedding + 暴力余弦检索
+rag/embedding/    第三系列：OpenAI 兼容 /v1/embeddings 薄封装（批量 + 磁盘缓存 + 余弦相似度）
+rag/cmd/embedapi/ 第三系列：真实 Embedding API 语义检索实测（bge-m3，含缓存对比）
 docs/             配套公众号教程
 ```
 

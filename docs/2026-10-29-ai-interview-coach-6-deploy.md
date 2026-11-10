@@ -97,7 +97,7 @@ params.StreamOptions = openai.ChatCompletionStreamOptionsParam{
 
 下一篇给机器人加记忆：每场面试的问答和评分落进 SQLite，飞书里发「历史」就能回看报告、看薄弱点的进步曲线——`modernc.org/sqlite`，纯 Go 无 CGO，和第二篇的思路一脉相承。
 
-如果对你有帮助，欢迎点赞、在看、转发，关注「GO语言入门之路」，系列更新不迷路。
+如果对你有帮助，欢迎点赞、在看、转发，关注「Go2AI之路」，系列更新不迷路。
 
 ---
 
