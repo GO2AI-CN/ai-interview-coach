@@ -100,7 +100,9 @@ deploy/           systemd unit 文件（7×24 部署，见第六篇）
 mcp/minimal/      第二系列：不依赖 SDK 的最小 MCP Server（JSON-RPC 2.0 + stdio）
 mcp/toolsdemo/    第二系列：进阶版——工具注册表 + 参数校验 + Resources 资料库
 mcp/coachstore/   第二系列：面试历史 SQLite 库的只读 MCP 服务（query_only 物理禁写）
+mcp/coachstore-sdk/ 第二系列：官方 go-sdk v1.8.0 版服务端（schema 由结构体推导，与手写版互通）
 mcp/coachclient/  第二系列：手写 MCP client + 函数调用循环（LLM 接口可插拔）
+mcp/coachclient-sdk/ 第二系列：用官方 go-sdk v1.8.0 重写的 client（调用面与手写版一致，可对照）
 mcp/extras/       第二系列：双向请求演示——Prompts / Sampling（已废弃，仅教学）/ Roots
 mcp/remote/       第二系列：Streamable HTTP 传输（POST/GET + SSE + 会话与鉴权）
 rag/cmd/embeddemo/ 第三系列：零依赖教学 demo——字符 bigram 手写 embedding + 暴力余弦检索
