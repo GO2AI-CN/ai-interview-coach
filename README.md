@@ -1,5 +1,7 @@
 # AI 模拟面试教练（Go + 大模型）
 
+> ⭐ **项目已开源**：[github.com/GO2AI-CN/ai-interview-coach](https://github.com/GO2AI-CN/ai-interview-coach)　代码 MIT 协议，欢迎 star / fork / PR，公众号「Go2AI之路」配套教程随仓库同步更新。
+
 用 Go 从零实现的产品级面试 Agent：**输入目标岗位（可选简历 PDF）→ 生成面试计划 → 逐题提问 → 评估回答深浅 → 答得浅就追问 → 面试结束输出结构化评分报告**。
 
 配套教程见 [`docs/`](docs/)：
@@ -28,6 +30,7 @@
 
 - [系列第 1 篇：大模型为什么总胡说八道？RAG 实战第一讲](docs/2026-11-06-go-rag-1-intro.md)
 - [系列第 2 篇：向量 Embedding 实战：Go 调用与模型选型](docs/2026-11-10-go-rag-2-embedding-api.md)
+- [系列第 3 篇：RAG 切分实战：chunk 怎么切，检索才不翻车](docs/2026-11-11-go-rag-3-chunking.md)
 
 ## 功能
 
@@ -103,6 +106,8 @@ mcp/remote/       第二系列：Streamable HTTP 传输（POST/GET + SSE + 会�
 rag/cmd/embeddemo/ 第三系列：零依赖教学 demo——字符 bigram 手写 embedding + 暴力余弦检索
 rag/embedding/    第三系列：OpenAI 兼容 /v1/embeddings 薄封装（批量 + 磁盘缓存 + 余弦相似度）
 rag/cmd/embedapi/ 第三系列：真实 Embedding API 语义检索实测（bge-m3，含缓存对比）
+rag/chunk/        第三系列：三种切分策略（固定窗口/段落合并/标题小节）+ chunk 元数据
+rag/cmd/chunkdemo/ 第三系列：16 篇教程三策略切分检索对比实测
 docs/             配套公众号教程
 ```
 
@@ -124,4 +129,4 @@ go test ./...
 
 ## License
 
-MIT
+[MIT](LICENSE) — 代码随意用，抄作业注明出处即可；`docs/` 下的公众号教程转载需联系作者授权。
