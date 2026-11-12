@@ -31,6 +31,7 @@
 - [系列第 1 篇：大模型为什么总胡说八道？RAG 实战第一讲](docs/2026-11-06-go-rag-1-intro.md)
 - [系列第 2 篇：向量 Embedding 实战：Go 调用与模型选型](docs/2026-11-10-go-rag-2-embedding-api.md)
 - [系列第 3 篇：RAG 切分实战：chunk 怎么切，检索才不翻车](docs/2026-11-11-go-rag-3-chunking.md)
+- [系列第 4 篇：向量库存哪？四类方案对比与 chromem-go 实战](docs/2026-11-12-go-rag-4-vector-store.md)
 
 ## 功能
 
@@ -110,6 +111,9 @@ rag/embedding/    第三系列：OpenAI 兼容 /v1/embeddings 薄封装（批量
 rag/cmd/embedapi/ 第三系列：真实 Embedding API 语义检索实测（bge-m3，含缓存对比）
 rag/chunk/        第三系列：三种切分策略（固定窗口/段落合并/标题小节）+ chunk 元数据
 rag/cmd/chunkdemo/ 第三系列：16 篇教程三策略切分检索对比实测
+rag/store/        第三系列：chromem-go 存储层（持久化/幂等写入/top-k 检索/metadata 过滤）
+rag/cmd/ingest/   第三系列：索引构建 CLI（docs → 标题切分 → bge-m3 嵌入 → 向量库）
+rag/cmd/ask/      第三系列：检索验证 CLI（top-k 命中块 + 来源 + 相似度）
 docs/             配套公众号教程
 ```
 

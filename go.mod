@@ -8,6 +8,7 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20261020125853-5e46805f718e
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/openai/openai-go/v3 v3.89.0
+	github.com/philippgille/chromem-go v0.7.0
 	modernc.org/sqlite v1.61.0
 )
 

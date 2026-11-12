@@ -4,3 +4,4 @@ report.md
 .idea
 .env
 .embed-cache/
+.vecdb/
