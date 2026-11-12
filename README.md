@@ -33,6 +33,7 @@
 - [系列第 3 篇：RAG 切分实战：chunk 怎么切，检索才不翻车](docs/2026-11-11-go-rag-3-chunking.md)
 - [系列第 4 篇：向量库存哪？四类方案对比与 chromem-go 实战](docs/2026-11-12-go-rag-4-vector-store.md)
 - [系列第 5 篇：让 AI 回答有出处：Go 流式问答全链路实战](docs/2026-11-12-go-rag-5-qa-chain.md)
+- [系列第 6 篇：10 道题实测：BM25+RRF 混合检索救回 RAG 翻车题](docs/2026-11-12-go-rag-6-hybrid-search.md)
 
 ## 功能
 
@@ -117,6 +118,9 @@ rag/cmd/ingest/   第三系列：索引构建 CLI（docs → 标题切分 → bg
 rag/cmd/ask/      第三系列：检索验证 CLI（top-k 命中块 + 来源 + 相似度）
 rag/prompt/       第三系列：检索结果组装层（资料编号注入 + 引用溯源清单，不依赖 SDK）
 rag/cmd/chat/     第三系列：完整问答 CLI（检索 → 拼 prompt → SSE 流式 → [n] 溯源，多轮）
+rag/hybrid/       第三系列：混合检索——BM25 关键词倒排（中文 bigram 切词）+ RRF 名次融合
+rag/cmd/eval/     第三系列：检索质量评测 CLI（10 道考题 × 三路检索，hit@k 汇总）
+rag/cmd/rerankdemo/ 第三系列：LLM 重排序演示（RRF top-10 → 大模型逐块打分重排）
 docs/             配套公众号教程
 ```
 
