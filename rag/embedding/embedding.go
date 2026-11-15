@@ -37,18 +37,31 @@ func New(apiKey, baseURL, model, cacheDir string) *Client {
 	return &Client{cli: openai.NewClient(opts...), model: model, cacheDir: cacheDir}
 }
 
+// Stats 是一次嵌入调用的缓存统计：Hit 为磁盘缓存命中数，Miss 为回源 API 数。
+// 增量索引算成本用（第 7 篇）：Miss 才是真金白银的 API 调用。
+type Stats struct{ Hit, Miss int }
+
 // Embed 把一组文本变成向量。命中磁盘缓存的文本不再请求 API；
 // 未命中的按 32 条一批合并请求，减少往返次数。
 func (c *Client) Embed(ctx context.Context, texts []string) ([][]float64, error) {
+	vecs, _, err := c.EmbedWithStats(ctx, texts)
+	return vecs, err
+}
+
+// EmbedWithStats 同 Embed，顺带返回缓存命中统计。
+func (c *Client) EmbedWithStats(ctx context.Context, texts []string) ([][]float64, Stats, error) {
 	vecs := make([][]float64, len(texts))
+	var st Stats
 	var missIdx []int // 未命中缓存的下标
 	for i, t := range texts {
 		if v, ok := c.load(t); ok {
 			vecs[i] = v
+			st.Hit++
 		} else {
 			missIdx = append(missIdx, i)
 		}
 	}
+	st.Miss = len(missIdx)
 	const batch = 32 // 单请求条数上限，避免超大请求超时
 	for start := 0; start < len(missIdx); start += batch {
 		end := min(start+batch, len(missIdx))
@@ -61,7 +74,7 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float64, error)
 			Input: openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: inputs},
 		})
 		if err != nil {
-			return nil, err
+			return nil, st, err
 		}
 		for j, item := range resp.Data {
 			idx := missIdx[start+j]
@@ -69,7 +82,7 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float64, error)
 			c.store(texts[idx], item.Embedding) // 落盘，下次免费
 		}
 	}
-	return vecs, nil
+	return vecs, st, nil
 }
 
 // cachePath 用 模型名+文本 的哈希做文件名，同模型同文本永远映射到同一缓存文件。

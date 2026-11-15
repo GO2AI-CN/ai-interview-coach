@@ -1,0 +1,9 @@
+# 构建上下文瘦身：本地数据与凭证绝不进镜像
+.git
+.vecdb/
+.embed-cache/
+.env
+*.exe
+coach.db
+.coach-state.json
+report.md

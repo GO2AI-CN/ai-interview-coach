@@ -66,15 +66,19 @@ func (s *Store) AddChunks(ctx context.Context, chunks []chunk.Chunk, vectors [][
 		for j, v := range vectors[i] {
 			vec[j] = float32(v)
 		}
+		md := map[string]string{
+			"file": c.File,
+			"head": c.Head,
+			"seq":  strconv.Itoa(c.Seq),
+		}
+		if c.Series != "" { // 第 7 篇：带系列标签的块才能被 where 过滤
+			md["series"] = c.Series
+		}
 		docs = append(docs, chromem.Document{
 			ID:        c.File + "#" + strconv.Itoa(c.Seq), // 幂等键：重复 ingest 同一块覆盖更新
 			Content:   c.Text,
 			Embedding: vec, // 非空 → chromem-go 跳过嵌入函数，仅归一化
-			Metadata: map[string]string{
-				"file": c.File,
-				"head": c.Head,
-				"seq":  strconv.Itoa(c.Seq),
-			},
+			Metadata:  md,
 		})
 	}
 	return s.col.AddDocuments(ctx, docs, 8) // 8 路并发嵌入计算——对我们是纯向量拷贝，开销可忽略
@@ -111,7 +115,7 @@ func (s *Store) Count(context.Context) int {
 	return s.col.Count()
 }
 
-// Delete 按文档 ID 删除（文档变更时增量索引用，第 7 篇接上）。
+// Delete 按文档 ID 删除（第 7 篇增量索引按账本 ID 清单清残块用）。
 func (s *Store) Delete(ctx context.Context, ids ...string) error {
 	return s.col.Delete(ctx, nil, nil, ids...)
 }

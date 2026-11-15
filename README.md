@@ -34,6 +34,7 @@
 - [系列第 4 篇：向量库存哪？四类方案对比与 chromem-go 实战](docs/2026-11-12-go-rag-4-vector-store.md)
 - [系列第 5 篇：让 AI 回答有出处：Go 流式问答全链路实战](docs/2026-11-12-go-rag-5-qa-chain.md)
 - [系列第 6 篇：10 道题实测：BM25+RRF 混合检索救回 RAG 翻车题](docs/2026-11-12-go-rag-6-hybrid-search.md)
+- [系列第 7 篇：只重建改动的文件：Go RAG 增量索引与 Docker 部署](docs/2026-11-15-go-rag-7-production.md)
 
 ## 功能
 
@@ -121,6 +122,10 @@ rag/cmd/chat/     第三系列：完整问答 CLI（检索 → 拼 prompt → SS
 rag/hybrid/       第三系列：混合检索——BM25 关键词倒排（中文 bigram 切词）+ RRF 名次融合
 rag/cmd/eval/     第三系列：检索质量评测 CLI（10 道考题 × 三路检索，hit@k 汇总）
 rag/cmd/rerankdemo/ 第三系列：LLM 重排序演示（RRF top-10 → 大模型逐块打分重排）
+rag/index/        第三系列：增量索引账本（manifest：文件哈希 + 块 ID 清单，变更三类分派）
+rag/cmd/sync/     第三系列：增量索引 CLI（新增/变更重建、删文清残块、未变整块跳过）
+rag/cmd/serve/    第三系列：HTTP 问答服务（/healthz + /ask 带溯源，Docker 部署载体）
+Dockerfile        第三系列：serve 多阶段构建（golang 编译 → alpine 运行，28MB 静态二进制）
 docs/             配套公众号教程
 ```
 

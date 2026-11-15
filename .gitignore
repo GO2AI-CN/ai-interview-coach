@@ -5,3 +5,4 @@ report.md
 .env
 .embed-cache/
 .vecdb/
+bin/

@@ -7,6 +7,7 @@
 //
 //	go run ./rag/cmd/ask "MCP 服务怎么发布到注册表？"
 //	go run ./rag/cmd/ask -k 5 "怎么给 Agent 加工具？"
+//	go run ./rag/cmd/ask -series mcp "怎么部署远程服务？"   # 第 7 篇：按系列过滤
 package main
 
 import (
@@ -25,6 +26,7 @@ import (
 func main() {
 	dbPath := flag.String("db", ".vecdb", "向量库目录")
 	topK := flag.Int("k", 3, "返回命中块数")
+	series := flag.String("series", "", "按系列过滤（coach/mcp/rag），空为不过滤")
 	flag.Parse()
 	if flag.NArg() == 0 {
 		log.Fatal("用法：go run ./rag/cmd/ask [-k N] \"你的问题\"")
@@ -51,7 +53,11 @@ func main() {
 		log.Fatalf("嵌入问题失败: %v", err)
 	}
 
-	hits, err := st.Search(ctx, qvecs[0], *topK, nil)
+	var filter map[string]string // 第 7 篇：metadata 等值过滤，nil 为不过滤
+	if *series != "" {
+		filter = map[string]string{"series": *series}
+	}
+	hits, err := st.Search(ctx, qvecs[0], *topK, filter)
 	if err != nil {
 		log.Fatalf("检索失败: %v", err)
 	}

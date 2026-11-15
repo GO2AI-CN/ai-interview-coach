@@ -14,10 +14,11 @@ import (
 
 // Chunk 是切分后的最小检索单元。
 type Chunk struct {
-	Text string `json:"text"` // 正文内容
-	File string `json:"file"` // 来源文件名，如 2026-11-06-go-rag-1-intro.md
-	Head string `json:"head"` // 所属 Markdown 标题路径，如 "四、追问策略"
-	Seq  int    `json:"seq"`  // 在文件内的序号，用于排序和去重
+	Text   string `json:"text"`             // 正文内容
+	File   string `json:"file"`             // 来源文件名，如 2026-11-06-go-rag-1-intro.md
+	Head   string `json:"head"`             // 所属 Markdown 标题路径，如 "四、追问策略"
+	Seq    int    `json:"seq"`              // 在文件内的序号，用于排序和去重
+	Series string `json:"series,omitempty"` // 所属系列（coach/mcp/rag），第 7 篇 metadata 过滤用
 }
 
 // BySize 固定窗口切分：实现最简，但块可能从句子中间断开，语义不完整。
@@ -115,4 +116,27 @@ func TagFile(file string, cs []Chunk) []Chunk {
 		cs[i].File = base
 	}
 	return cs
+}
+
+// TagSeries 给一组 chunk 打上系列标签，检索时即可按 series 过滤（第 7 篇）。
+func TagSeries(cs []Chunk) []Chunk {
+	for i := range cs {
+		cs[i].Series = SeriesOf(cs[i].File)
+	}
+	return cs
+}
+
+// SeriesOf 按本仓库 docs/ 的文件名约定推断所属系列；
+// 换一套语料只需改这一个函数，规则集中不分散。
+func SeriesOf(file string) string {
+	switch {
+	case strings.Contains(file, "ai-interview-coach"):
+		return "coach"
+	case strings.Contains(file, "go-mcp"):
+		return "mcp"
+	case strings.Contains(file, "go-rag"):
+		return "rag"
+	default:
+		return "other"
+	}
 }
