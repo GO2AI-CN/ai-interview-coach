@@ -37,6 +37,10 @@
 - [系列第 7 篇：只重建改动的文件：Go RAG 增量索引与 Docker 部署](docs/2026-11-15-go-rag-7-production.md)
 - [系列第 8 篇·收官：5 万块压测 + 6 款向量库横评：Go RAG 收官](docs/2026-11-20-go-rag-8-vector-db-showdown.md)
 
+第四系列「多 Agent 协作」（从零实现一个 Go 多智能体协作框架，配套代码在 `multi/`）：
+
+- [系列第 1 篇：一个 Agent 不够？多智能体协作第一课](docs/2026-11-23-multi-agent-1-intro.md)
+
 ## 功能
 
 - **面试计划**：基于岗位能力模型（rubric）一次性生成 5~8 题，每题带可验证的考察要点（checkpoints）
