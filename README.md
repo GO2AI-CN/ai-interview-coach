@@ -41,6 +41,12 @@
 
 - [系列第 1 篇：一个 Agent 不够？多智能体协作第一课](docs/2026-11-23-multi-agent-1-intro.md)
 - [系列第 2 篇：任务总派错人？Go 手写一个多 Agent 编排者](docs/2026-11-23-multi-agent-2-orchestrator.md)
+- [系列第 3 篇：上下文总断片？给 Agent 设计一个 Handoff 交接包](docs/2026-11-23-multi-agent-3-handoff.md)
+- [系列第 4 篇：Agent 各干各的互不知情？加一块共享黑板就搞定](docs/2026-11-23-multi-agent-4-blackboard.md)
+- [系列第 5 篇：Agent 空转轮询太蠢？给黑板装上事件通知](docs/2026-11-23-multi-agent-5-events.md)
+- [系列第 6 篇：Agent 干得好不好？给协作链路装上轨迹评测](docs/2026-11-23-multi-agent-6-trace.md)
+- [系列第 7 篇：Agent 卡死怎么办？给每棒装上超时、熔断与降级](docs/2026-11-23-multi-agent-7-guard.md)
+- [系列第 8 篇（收官）：三 Agent 搭一个面试教练：多智能体协作收官](docs/2026-11-23-multi-agent-8-finale.md)
 
 ## 功能
 
