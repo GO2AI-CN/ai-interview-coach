@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Orchestrator 实现主从（Supervisor-Worker）拓扑：
@@ -12,12 +13,17 @@ import (
 // 自己一行产出都不写，干活全部委托出去。
 type Orchestrator struct {
 	workers map[string]Agent // 角色名 → 干活的 Agent
+	rec     *Recorder        // 可选轨迹记录器；nil 表示不记录
 }
 
 // NewOrchestrator 创建一个空的编排者。
 func NewOrchestrator() *Orchestrator {
 	return &Orchestrator{workers: map[string]Agent{}}
 }
+
+// WithRecorder 挂上轨迹记录器。之后每次 Run 的每一棒
+// 都会留下一段带耗时和错误信息的 Span。
+func (o *Orchestrator) WithRecorder(r *Recorder) { o.rec = r }
 
 // Register 把某个角色绑定到一个 Agent。后注册覆盖先注册。
 func (o *Orchestrator) Register(role string, a Agent) {
@@ -49,7 +55,18 @@ func (o *Orchestrator) Run(ctx context.Context, goal string, plan PlanFunc) (Res
 		if !ok {
 			return Result{}, fmt.Errorf("multi: 子任务 %d 引用了未注册的角色 %q", i, s.Role)
 		}
+		start := time.Now()
 		r, err := w.Run(ctx, s.Task)
+		if o.rec != nil { // 挂了记录器才记轨迹，行为零侵入
+			o.rec.Record(Span{
+				Role:    s.Role,
+				Goal:    s.Task.Goal,
+				Input:   summarizeInputs(s.Task.Inputs),
+				Output:  r.Summary,
+				Latency: time.Since(start),
+				Err:     err,
+			})
+		}
 		if err != nil {
 			return Result{}, fmt.Errorf("multi: 角色 %q 执行失败: %w", s.Role, err)
 		}
@@ -60,4 +77,14 @@ func (o *Orchestrator) Run(ctx context.Context, goal string, plan PlanFunc) (Res
 		Output:  strings.Join(outputs, "\n\n"),
 		Summary: strings.Join(summaries, "；"),
 	}, nil
+}
+
+// summarizeInputs 把任务的输入材料压成一行摘要进轨迹，
+// 完整内容留在 Agent 内部，轨迹只记"喂了什么"。
+func summarizeInputs(inputs map[string]string) string {
+	parts := make([]string, 0, len(inputs))
+	for k, v := range inputs {
+		parts = append(parts, k+"="+v)
+	}
+	return strings.Join(parts, "; ")
 }
