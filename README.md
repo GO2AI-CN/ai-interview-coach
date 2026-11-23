@@ -40,6 +40,7 @@
 第四系列「多 Agent 协作」（从零实现一个 Go 多智能体协作框架，配套代码在 `multi/`）：
 
 - [系列第 1 篇：一个 Agent 不够？多智能体协作第一课](docs/2026-11-23-multi-agent-1-intro.md)
+- [系列第 2 篇：任务总派错人？Go 手写一个多 Agent 编排者](docs/2026-11-23-multi-agent-2-orchestrator.md)
 
 ## 功能
 
