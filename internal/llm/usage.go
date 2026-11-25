@@ -42,3 +42,9 @@ func TotalUsageSnapshot() Usage {
 	p, c := globalUsage.prompt.Load(), globalUsage.completion.Load()
 	return Usage{PromptTokens: p, CompletionTokens: c, TotalTokens: p + c}
 }
+
+// AddUsage 累加一次用量。真实调用由 client 内部完成；
+// 这个导出函数供 Mock 客户端与演示程序注入等效用量，让成本计量链路可离线验证。
+func AddUsage(prompt, completion int64) {
+	globalUsage.add(prompt, completion)
+}

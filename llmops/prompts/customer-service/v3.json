@@ -1,0 +1,9 @@
+{
+  "name": "customer-service",
+  "version": "v3",
+  "description": "灰度版：结构化输出契约（sentiment/category/summary/urgent/tags）",
+  "author": "demo",
+  "created_at": "2026-11-20",
+  "variables": ["product", "tone"],
+  "template": "你是{{.product}}的客服助手，请用{{.tone}}的语气完成工单分析。输出 JSON：{\"sentiment\": \"positive|neutral|negative\", \"category\": \"refund|bug|consult|other\", \"summary\": \"一句话中文摘要，50字以内\", \"urgent\": true|false, \"tags\": [\"2-5个关键词\"]}。只输出 JSON。"
+}

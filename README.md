@@ -139,6 +139,9 @@ rag/cmd/sync/     第三系列：增量索引 CLI（新增/变更重建、删文
 rag/cmd/serve/    第三系列：HTTP 问答服务（/healthz + /ask 带溯源，Docker 部署载体）
 rag/cmd/vsbench/  第三系列收官：向量库压测 CLI（真实库体检 + 5k/20k/50k 规模合成压测）
 Dockerfile        第三系列：serve 多阶段构建（golang 编译 → alpine 运行，28MB 静态二进制）
+multi/            第四系列（多智能体）：编排者/交接/黑板/事件驱动/轨迹评测/熔断 Guard/三 Agent 收官
+llmops/           第五系列（LLM 应用工程化，8 篇）：Prompt Registry/结构化防线/评测集/成本/语义缓存/Trace/安全护栏
+llmops/demo 入口：go run ./cmd/llmops-demo（离线 Mock 全链路，无需 API Key）
 docs/             配套公众号教程
 ```
 
