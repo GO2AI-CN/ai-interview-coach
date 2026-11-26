@@ -48,6 +48,17 @@
 - [系列第 7 篇：Agent 卡死怎么办？给每棒装上超时、熔断与降级](docs/2026-11-23-multi-agent-7-guard.md)
 - [系列第 8 篇（收官）：三 Agent 搭一个面试教练：多智能体协作收官](docs/2026-11-23-multi-agent-8-finale.md)
 
+第五系列「LLM 应用工程化」（从零实现一套可复用的 LLM 工程化组件库，配套代码在 `llmops/`，[博客聚合页](https://blog.911015.com/ai/llm-ops.html)）：
+
+- [系列第 1 篇：Prompt 管理别再硬编码，版本化、灰度发布与一键回滚](docs/2026-11-25-llm-ops-1-prompt-mgmt.md)
+- [系列第 2 篇：结构化输出与 Schema 校验，给模型的 JSON 上一道保险](docs/2026-11-25-llm-ops-2-structured-output.md)
+- [系列第 3 篇：自动化评测集，把「感觉变好了」变成 CI 里的一行数字](docs/2026-11-25-llm-ops-3-eval-suite.md)
+- [系列第 4 篇：Token 成本计量与限流，让账单从月底惊吓变成尽在掌握](docs/2026-11-25-llm-ops-4-cost-ratelimit.md)
+- [系列第 5 篇：语义缓存实战，相似的问题不该花两次钱](docs/2026-11-25-llm-ops-5-semantic-cache.md)
+- [系列第 6 篇：LLM 调用全链路 Trace，把黑盒拆开看](docs/2026-11-25-llm-ops-6-trace.md)
+- [系列第 7 篇：Prompt Injection 攻防，LLM 应用独有的攻击面](docs/2026-11-25-llm-ops-7-injection.md)
+- [系列第 8 篇（收官）：把 7 个组件拼成可复用的工程化平台](docs/2026-11-25-llm-ops-8-finale.md)
+
 ## 功能
 
 - **面试计划**：基于岗位能力模型（rubric）一次性生成 5~8 题，每题带可验证的考察要点（checkpoints）
