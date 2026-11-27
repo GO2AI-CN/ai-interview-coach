@@ -59,6 +59,10 @@
 - [系列第 7 篇：Prompt Injection 攻防，LLM 应用独有的攻击面](docs/2026-11-25-llm-ops-7-injection.md)
 - [系列第 8 篇（收官）：把 7 个组件拼成可复用的工程化平台](docs/2026-11-25-llm-ops-8-finale.md)
 
+第六系列「Agent 记忆系统」（从零实现一套 Agent 记忆系统，配套代码在 `memory/`；[规划文档](docs/plan-memory-series.md)）：
+
+- [系列第 1 篇：为什么你的 Agent 总忘事？记忆系统入门第一课](docs/2026-11-26-agent-memory-1-intro.md)
+
 ## 功能
 
 - **面试计划**：基于岗位能力模型（rubric）一次性生成 5~8 题，每题带可验证的考察要点（checkpoints）
